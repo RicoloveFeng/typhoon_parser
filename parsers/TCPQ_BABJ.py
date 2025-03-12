@@ -33,11 +33,18 @@ class TCPQ_BABJ(MessageParser):
             '9': '21-30h',
             '/': '未确定',
         }
+        ci_raw = msg['ci']
+        if ci_raw == '//':
+            ci_str = 'CI值不明'
+        elif ci_raw == '99':
+            ci_str = '该气旋将逐渐转为温带气旋'
+        else:
+            ci_str = f"CI值为{msg['ci'][0]}.{msg['ci'][1]}"
         return '\n'.join([
-            f"中央气象台在世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风发展报文",
+            f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风发展报文",
             f"观测时间：世界协调时{msg['ob_dd']}日{msg['ob_hh']}时{msg['ob_mm']}0分",
             f"热带气旋{msg['name']}(编号{msg['ty_num']})，当前中心位于"+ty_loc_tmpl[msg['quadrant']].format(float(msg['ty_la'])/10, float(msg['ty_lo'])/10),
-            f"CI值为{msg['ci'][0]}.{msg['ci'][1]}，将以{int(msg['spd'])}节的速度向{msg['dir']}°方向移动，强度{ty_intense_expl[msg['intense']]}",
+            f"{ci_str}，将以{int(msg['spd'])}节的速度向{msg['dir']}°方向移动，强度{ty_intense_expl[msg['intense']]}",
             f"本次计算热带气旋运动的时间间隔为{time_intv_expl[msg['time_intv']]}"        
         ])
     
@@ -79,11 +86,3 @@ class TCPQ_BABJ(MessageParser):
         ]
         return msg_format
         
-if __name__ == '__main__':
-    test_tc = """
-TCPQ40 BABJ 250600
-CCAA 25060 99398 11165
-PABUK 26097 11103 12114 220// 92009
-"""
-    tc = TCPQ_BABJ()
-    print(tc.explain(tc.parse(test_tc)))

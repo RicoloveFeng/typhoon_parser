@@ -2,6 +2,8 @@ import argparse
 import json 
 
 from parsers.TCPQ_BABJ import TCPQ_BABJ
+from parsers.WTPQ_BABJ import WTPQ_BABJ
+from parsers.WSCI_BABJ import WSCI_BABJ
 from parsers.message_parser import MessageParser
 
 class MessageParserManager:
@@ -35,6 +37,8 @@ if __name__ == '__main__':
     # adding parsers
     manager = MessageParserManager(args.code)
     manager.add_parser(TCPQ_BABJ())
+    manager.add_parser(WTPQ_BABJ())
+    manager.add_parser(WSCI_BABJ())
     
     # parsing codes
     with open(args.code, 'r') as f:
