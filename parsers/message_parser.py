@@ -1,3 +1,5 @@
+from collections import defaultdict
+import re
 class MessageParser:
     def __init__(self, msg_type: str):
         self.msg_type = msg_type
@@ -5,24 +7,31 @@ class MessageParser:
     def parse(self, code: str) -> dict:
         """
         Read message code and parse it with message format
+        
+        Duplication rule
+        - To handle optional variable length fields, a field could show up more than once in format.
+        - if a field is duplicated, then it will be recorded as 'field/n',
+          where n is the number of times it is presented, counting from 0
+        
+          example: 'name' shows up 2 times, then first one is 'name', second one is 'name/1'
         :return: field -> raw value
         """
         code = code.strip()
         result = {}
         index = 0
         format_list = self.get_format()
+        field_counter = defaultdict(int)
 
         def parse_rule(rule_list, current_index, depth = 0):
-            local_result = {}
+            nonlocal result 
             i = 0
             while i < len(rule_list):
                 # print(f"dealing layer {depth}, {i}/{len(rule_list)}...")
                 rule = rule_list[i]
                 if isinstance(rule, list):
-                    strict_match_str = rule[0]
-                    if current_index + len(strict_match_str) <= len(code) and code[current_index:current_index + len(strict_match_str)] == strict_match_str:
-                        sub_result, current_index = parse_rule(rule[1:], current_index, depth=depth + 1)
-                        local_result.update(sub_result)
+                    strict_match_str = rf'^{rule[0]}'
+                    if re.match(strict_match_str, code[current_index:]):
+                        current_index = parse_rule(rule[1:], current_index, depth=depth + 1)
                         # print('match optional')
                     else:
                         # print('unmatched optional')
@@ -70,12 +79,14 @@ class MessageParser:
                             raise ValueError(f"报文长度不足，无法解析字段 {field}")
                         value = code[current_index:current_index + length]
                         current_index += length
-                    local_result[field] = value
-                    print(f"{field}: {value}")
+                    if field in result:
+                        field_counter[field] += 1
+                        field += f'/{field_counter[field]}'
+                    result[field] = value
                 i += 1
-            return local_result, current_index
+            return current_index
 
-        result, index = parse_rule(format_list, index)
+        index = parse_rule(format_list, index)
 
         if index < len(code):
             print(f"Format cannot cover all message. Remaining message:#{code[index:]}#")
@@ -88,12 +99,20 @@ class MessageParser:
         """
         raise NotImplementedError
     
-    def translate(self, msg: dict) -> str:
+    def get_translation(self) -> dict:
         """
-        Translate message to human readable string
-        :return: a translated paragraph
+        A translation dictionary to help translating message
+        :return: field -> translation
         """
         raise NotImplementedError
+    
+    def translate(self, field: str) -> str:
+        """
+        Translate field to it's meaning
+        """
+        field = field.split('/')[0]
+        return self.get_translation().get(field, '')
+        
     
     def get_format(self) -> list:
         """
@@ -102,7 +121,9 @@ class MessageParser:
         - 'field:length': field name and it's length. 
             - When length is S, it means parsing until a whitespace.
             - When length is $, it means parsing until line break.
-        - [' 30KTS', ...]: optional, only process when prefix matches the first token of the list.
+            - When length is -WORD, it means parsing until WORD.
+        - [' 30KTS', ...]: optional, only process when message prefix matches the first token of the list.
+            - It is actually a regex matching, but wrapped as rf'^{tokens[0]}'.
         - 'ws': whitespace
         - 'br': line break
         """

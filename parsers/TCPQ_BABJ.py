@@ -18,7 +18,7 @@ class TCPQ_BABJ(MessageParser):
             '3': '逐渐增强',
             '4': '明显增强',
             '9': '以前未观测，无法判断强度',
-            '/': '未确定',
+            '/': '【未定】',
         }
         time_intv_expl = {
             '0': '<1h',
@@ -31,24 +31,50 @@ class TCPQ_BABJ(MessageParser):
             '7': '15-18h',
             '8': '18-21h',
             '9': '21-30h',
-            '/': '未确定',
+            '/': '【未定】',
         }
-        ci_raw = msg['ci']
-        if ci_raw == '//':
-            ci_str = 'CI值不明'
-        elif ci_raw == '99':
-            ci_str = '该气旋将逐渐转为温带气旋'
-        else:
-            ci_str = f"CI值为{msg['ci'][0]}.{msg['ci'][1]}"
-        return '\n'.join([
+        
+        expl = [
             f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风发展报文",
             f"观测时间：世界协调时{msg['ob_dd']}日{msg['ob_hh']}时{msg['ob_mm']}0分",
-            f"热带气旋{msg['name']}(编号{msg['ty_num']})，当前中心位于"+ty_loc_tmpl[msg['quadrant']].format(float(msg['ty_la'])/10, float(msg['ty_lo'])/10),
-            f"{ci_str}，将以{int(msg['spd'])}节的速度向{msg['dir']}°方向移动，强度{ty_intense_expl[msg['intense']]}",
-            f"本次计算热带气旋运动的时间间隔为{time_intv_expl[msg['time_intv']]}"        
-        ])
+        ]
+        
+        for i in range(5):
+            idx_string = f"/{i}" if i > 0 else ''
+            if 'name'+idx_string not in msg:
+                break
+            name = msg['name'+idx_string]
+            ty_num = msg['ty_num'+idx_string]
+            quad = msg['quadrant'+idx_string]
+            ty_la = msg['ty_la'+idx_string]
+            ty_lo = msg['ty_lo'+idx_string]
+            intense = msg['intense'+idx_string]
+            time_intv = msg['time_intv'+idx_string]
+            
+            ci_raw = msg['ci'+idx_string]
+            if ci_raw == '//':
+                ci_str = 'CI值不明'
+            elif ci_raw == '99':
+                ci_str = '该气旋将逐渐转为温带气旋'
+            else:
+                ci_str = f"CI值为{ci_raw[0]}.{ci_raw[1]}"
+                
+            dir = msg['dir'+idx_string]
+            spd = msg['spd'+idx_string]
+            if dir == '//':
+                dir_spd_str = "无移速与移向信息"
+            else:
+                dir_spd_str = f"将以{int(spd)}节的速度向{int(dir)*10}°方向移动"
+                
+            expl.extend([
+                f"热带气旋{name}(编号{ty_num})，当前中心位于"+ty_loc_tmpl[quad].format(float(ty_lo)/10, float(ty_la)/10),
+                f"{ci_str}，{dir_spd_str}，强度{ty_intense_expl[intense]}",
+                f"计算运动的时间间隔为{time_intv_expl[time_intv]}" 
+            ])
+        
+        return '\n'.join(expl)
     
-    def translate(self, msg: dict) -> str:
+    def get_translation(self, msg: dict) -> str:
         return {
             'type': '报文格式，表示基于台风卫星云图的发展趋势分析',
             'area': '报文涉及的区域，PQ=西北太平洋',
@@ -74,15 +100,16 @@ class TCPQ_BABJ(MessageParser):
             'intense': '热带气旋强度24小时变化情况，0-4为减弱或增强，9=未观测，/=未确定',
             'time_intv': '计算热带气旋变化的时间间隔',
             'ci': '强度，以CI值表示',
-            'dir': '移动方向，以10度表示',
+            'dir': '移动方向，以正北方向顺时针旋转计算，单位为10度',
             'spd': '移动速度，以节表示',
         }
     
     def get_format(self) -> list:
+        ty_disc_format = ['*', 'name:S', 'ws', 'ty_num:2', 'ty_la:3', 'ws', 'quadrant:1', 'ty_lo:4', 'ws', 'pad3:1', 'prec:1', 'horizon:1', 'intense:1', 'time_intv:1', 'ws', 'pad4:1', 'ci:2', 'slash:S', 'ws', 'pad5:1', 'dir:2', 'spd:2', 'br',],
         msg_format = [
             'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
             'sarep:2', 'ty_dev:2', 'ws', 'ob_dd:2', 'ob_hh:2', 'ob_mm:1', 'ws', 'pad1:2', 'ob_la:3', 'ws', 'pad2:1', 'ob_lo:4', 'br',
-            'name:S', 'ws', 'ty_num:2', 'ty_la:3', 'ws', 'quadrant:1', 'ty_lo:4', 'ws', 'pad3:1', 'prec:1', 'horizon:1', 'intense:1', 'time_intv:1', 'ws', 'pad4:1', 'ci:2', 'slash:S', 'ws', 'pad5:1', 'dir:2', 'spd:2'
         ]
+        msg_format.extend(ty_disc_format * 5)
         return msg_format
         

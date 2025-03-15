@@ -58,7 +58,7 @@ class WSCI_BABJ(MessageParser):
             begin_date_str
         ])
     
-    def translate(self, msg: dict) -> str:
+    def get_translation(self, msg: dict) -> str:
         return {
             'type': '报文格式，表示基于台风起编/停编报文',
             'area': '报文涉及的区域，CI=中国',
@@ -81,8 +81,8 @@ class WSCI_BABJ(MessageParser):
             'bezz': '郑州台',
             'bebj': '北京台',
             'telecode': '中文电码',
-            'babj/3049': '中央气象台发',
-            'telecode2': '中文电码，表发报时间'
+            'babj/3049': '中央气象台发 （3049=气）',
+            'telecode2': '中文电码，表示发报时间'
         }
     
     def get_format(self) -> list:
