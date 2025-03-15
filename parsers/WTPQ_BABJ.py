@@ -33,10 +33,13 @@ class WTPQ_BABJ(MessageParser):
             'NNW': '西北偏北',
         }
         
-        
+        if msg['cat'] == 'TD':
+            name_str = f"热带低压{msg['name']} 未命名"
+        else:
+            name_str = f"{cat_expl[msg['cat']]}{msg['name']}，编号{msg['dom_num']}，国际编号{msg['inter_num']}",
         expl = [
             f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风综合预报报文",
-            f"{cat_expl[msg['cat']]}{msg['name']}，编号{msg['dom_num']}，国际编号{msg['inter_num']}",
+            name_str,
             f"起报时间：世界协调时{msg['init_dd']}日{msg['init_hh']}时{msg['init_mm']}分",
             f"当前位置：{msg['ty_la']} {msg['ty_lo']}",
             f"中心气压：{msg['wind_spd']}，最大风速：{msg['wind_spd']}",
