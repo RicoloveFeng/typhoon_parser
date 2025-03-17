@@ -74,7 +74,7 @@ class TCPQ_BABJ(MessageParser):
         
         return '\n'.join(expl)
     
-    def get_translation(self, msg: dict) -> str:
+    def get_translation(self) -> str:
         return {
             'type': '报文格式，表示基于台风卫星云图的发展趋势分析',
             'area': '报文涉及的区域，PQ=西北太平洋',
@@ -92,11 +92,11 @@ class TCPQ_BABJ(MessageParser):
             'ob_lo': '观测站纬度，即116.5E',
             'name': '热带气旋名称',
             'ty_num': '热带气旋编号',
-            'ty_la': '中心经度',
-            'ty_lo': '中心纬度',
+            'ty_la': '中心纬度',
+            'ty_lo': '中心经度',
             'quadrant': '经纬度象限，1=NE,3=SE,5=SW,7=NW',
-            'prec': '确定台风位置的准确性',
-            'horizon': '热带气旋水平范围，以纬度表示',
+            'prec': '确定台风位置的准确性，越小精确度越高',
+            'horizon': '密闭云区直径，以纬度表示，以当前纬距向下取整',
             'intense': '热带气旋强度24小时变化情况，0-4为减弱或增强，9=未观测，/=未确定',
             'time_intv': '计算热带气旋变化的时间间隔',
             'ci': '强度，以CI值表示',
@@ -105,7 +105,7 @@ class TCPQ_BABJ(MessageParser):
         }
     
     def get_format(self) -> list:
-        ty_disc_format = ['*', 'name:S', 'ws', 'ty_num:2', 'ty_la:3', 'ws', 'quadrant:1', 'ty_lo:4', 'ws', 'pad3:1', 'prec:1', 'horizon:1', 'intense:1', 'time_intv:1', 'ws', 'pad4:1', 'ci:2', 'slash:S', 'ws', 'pad5:1', 'dir:2', 'spd:2', 'br',],
+        ty_disc_format = ['.', 'name:S', 'ws', 'ty_num:2', 'ty_la:3', 'ws', 'quadrant:1', 'ty_lo:4', 'ws', 'pad3:1', 'prec:1', 'horizon:1', 'intense:1', 'time_intv:1', 'ws', 'pad4:1', 'ci:2', 'slash:S', 'ws', 'pad5:1', 'dir:2', 'spd:2', 'br',],
         msg_format = [
             'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
             'sarep:2', 'ty_dev:2', 'ws', 'ob_dd:2', 'ob_hh:2', 'ob_mm:1', 'ws', 'pad1:2', 'ob_la:3', 'ws', 'pad2:1', 'ob_lo:4', 'br',

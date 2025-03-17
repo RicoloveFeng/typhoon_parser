@@ -14,7 +14,7 @@ def parse_telecode(code: str) -> str:
     def decode_one(four_digit: str) -> str:
         if not four_digit:
             return ''
-        if token[0:2] in ['97', '98', '99']:
+        if four_digit[0:2] in ['97', '98', '99']:
             decode_subset = {
                 '75': '。',
                 '76': '，',
@@ -22,11 +22,11 @@ def parse_telecode(code: str) -> str:
                 '78': 'E',
                 '99': 'Z',
             }
-            if token[2:] in decode_subset:
-                return decode_subset[token[2:]]
-            return token[2:]
+            if four_digit[2:] in decode_subset:
+                return decode_subset[four_digit[2:]]
+            return four_digit[2:]
         
-        return telecode_table.get(token, '?')
+        return telecode_table.get(four_digit, f'[{four_digit}]')
             
     result = []
     for token in re.split(' |\n', code):
@@ -58,7 +58,7 @@ class WSCI_BABJ(MessageParser):
             begin_date_str
         ])
     
-    def get_translation(self, msg: dict) -> str:
+    def get_translation(self) -> str:
         return {
             'type': '报文格式，表示基于台风起编/停编报文',
             'area': '报文涉及的区域，CI=中国',

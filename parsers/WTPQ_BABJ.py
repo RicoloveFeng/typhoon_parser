@@ -67,7 +67,7 @@ class WTPQ_BABJ(MessageParser):
         report = report.replace('HPA', 'hPa').replace('M/S', 'm/s').replace('KM', 'km').replace('/H', '/h')
         return report
     
-    def get_translation(self, msg: dict) -> str:
+    def get_translation(self) -> str:
         translation = {
             'type': '报文格式，表示基于台风卫星云图的发展趋势分析',
             'area': '报文涉及的区域，PQ=西北太平洋',
