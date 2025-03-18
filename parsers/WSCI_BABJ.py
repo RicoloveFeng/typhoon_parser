@@ -51,7 +51,7 @@ class WSCI_BABJ(MessageParser):
             MM, dd, hh = [int(digits[2:]) for digits in msg['telecode2'].strip().split(' ')]
             begin_date_str = f"，{MM}月{dd}日{hh:2}时"
         return '\n'.join([
-            f"中央气象台在世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风编号报文",
+            f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风编号报文",
             f"发往沈阳/武汉/上海/成都/广州/太原/西安/天津/深圳/济南/郑州/北京",
             parse_telecode(msg['telecode']),
             "发自中央气象台" +  
@@ -73,7 +73,7 @@ class WSCI_BABJ(MessageParser):
             'bcsh': '上海台',
             'bccd': '成都台',
             'bcgz': '广州台',
-            'bcty': '太原台',
+            'bety': '太原台',
             'bexa': '西安台',
             'betj': '天津台',
             'besz': '深圳台',
@@ -81,7 +81,7 @@ class WSCI_BABJ(MessageParser):
             'bezz': '郑州台',
             'bebj': '北京台',
             'telecode': '中文电码',
-            'babj/3049': '中央气象台发 （3049=气）',
+            'babj-3049': '中央气象台发 （3049=气）',
             'telecode2': '中文电码，表示发报时间'
         }
     
@@ -91,7 +91,7 @@ class WSCI_BABJ(MessageParser):
             'to:2', 'ws', 'bcsy:4', 'ws', 'bchk:4', 'ws', 'bcsh:4', 'ws', 'bccd:4', 'ws', 'bcgz:4', 'br',
             'bety:4', 'ws', 'bexa:4', 'ws', 'betj:4', 'ws', 'besz:4', 'ws', 'bejn:4', 'ws', 'bezz:4', 'ws', 'bebj:4', 'br',
             'telecode:-BABJ', 
-            'babj/3049:9', 'ws', ['97', 'telecode2:$']
+            'babj-3049:9', 'ws', ['97', 'telecode2:$']
         ]
         return msg_format
         

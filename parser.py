@@ -2,7 +2,6 @@ import argparse
 from collections import defaultdict
 import json 
 
-
 from parsers.TCPQ_BABJ import TCPQ_BABJ
 from parsers.WTPQ_BABJ import WTPQ_BABJ
 from parsers.WSCI_BABJ import WSCI_BABJ
@@ -11,6 +10,9 @@ from parsers.message_parser import MessageParser
 class MessageParserManager:
     def __init__(self):
         self.parser_map = {}
+        self.add_parser(TCPQ_BABJ())
+        self.add_parser(WTPQ_BABJ())
+        self.add_parser(WSCI_BABJ())
 
     def add_parser(self, parser: MessageParser):
         self.parser_map[parser.get_type()] = parser
@@ -32,7 +34,7 @@ class MessageParserManager:
     def explain(self, msg: dict) -> str:
         return self.get_parser_from_msg(msg).explain(msg)
     
-    def translate(self, field: str) -> str:
+    def translate(self, msg: dict, field: str) -> str:
         return self.get_parser_from_msg(msg).translate(field)
     
     def get_format(self, msg: dict) -> list:
@@ -55,7 +57,7 @@ class MessageParserManager:
                     raw_msg.append((" ",))
                 elif rule == 'br':
                     # 添加换行符
-                    raw_msg.append(("\n",))
+                    raw_msg.append(("<br>",))
                 else:
                     field, length_str = rule.split(':')
                     # 处理重复字段
@@ -65,7 +67,7 @@ class MessageParserManager:
                         actual_field = field
                     if actual_field in msg:
                         field_value = msg[actual_field]
-                        translation = manager.translate(actual_field)
+                        translation = self.translate(msg, actual_field)
                         if translation:
                             raw_msg.append((field_value, translation))
                         else:
@@ -85,9 +87,6 @@ if __name__ == '__main__':
     
     # adding parsers
     manager = MessageParserManager()
-    manager.add_parser(TCPQ_BABJ())
-    manager.add_parser(WTPQ_BABJ())
-    manager.add_parser(WSCI_BABJ())
     
     # parsing codes
     with open(args.code, 'r') as f:
