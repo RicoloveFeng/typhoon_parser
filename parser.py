@@ -5,7 +5,11 @@ import json
 from parsers.TCPQ_BABJ import TCPQ_BABJ
 from parsers.WTPQ_BABJ import WTPQ_BABJ
 from parsers.WSCI_BABJ import WSCI_BABJ
+from parsers.TPPN1x_PGTW import TPPN1x_PGTW
+from parsers.WDPN3x_PGTW import WDPN3x_PGTW
+from parsers.WTPQ3x_RJTD import WTPQ3x_RJTD
 from parsers.message_parser import MessageParser
+from parsers.default_parser import DefaultParser
 
 class MessageParserManager:
     def __init__(self):
@@ -13,29 +17,64 @@ class MessageParserManager:
         self.add_parser(TCPQ_BABJ())
         self.add_parser(WTPQ_BABJ())
         self.add_parser(WSCI_BABJ())
+        self.add_parser(TPPN1x_PGTW())
+        self.add_parser(WDPN3x_PGTW())
+        self.add_parser(WTPQ3x_RJTD())
 
     def add_parser(self, parser: MessageParser):
-        self.parser_map[parser.get_type()] = parser
+        for header in parser.get_supported_headers():
+            self.parser_map[header] = parser
         
-    def get_parser_from_msg(self, msg: dict) -> MessageParser:
-        msg_type = f"{msg['type']}{msg['area']}_{msg['msg_center']}"
-        parser = self.parser_map.get(msg_type, None)
-        if not parser:
-            raise ValueError(f'Message type {msg_type} not supported')
+    def get_parser_from_code(self, code: str) -> MessageParser:
+        msg_type = code[:11]
+        parser = self.parser_map.get(msg_type, DefaultParser())
         return parser
 
+    def get_parser_from_msg(self, msg: dict) -> MessageParser:
+        header = f"{msg['type']}{msg['area']}{msg['ii']} {msg['msg_center']}"
+        return self.get_parser_from_code(header)
+
     def parse(self, code: str) -> dict:
-        msg_type = f"{code[:4]}_{code[7:11]}"
-        parser = self.parser_map.get(msg_type, None)
-        if not parser:
-            raise ValueError(f'Message type {msg_type} not supported')
-        return parser.parse(code)
+        return self.get_parser_from_code(code).parse(code)
+    
+    def parse_from_raw(self, raw_msg: list) -> dict:
+        """
+        :param raw_msg: a tuple of (time_str, raw_code, source)
+        :return: dict
+        - time_str, source
+        - has_zczc, has_nnnn: bool, whether the message contains ZCZC or NNNN
+        - striped_msg: str, the stripped message with no extra characters
+        - parsed_msg: dict, the parsed message by parser
+        """
+        time_str, raw_code, source = raw_msg
+        # NMC contains ZCZC and NNNN
+        msg_meta = {}
+        real_content = ''
+        if source == "NMC":
+            real_content = raw_code.replace('ZCZC', '').replace('NNNN', '').strip()
+            msg_meta['has_zczc'] = True
+            msg_meta['has_nnnn'] = True
+        elif source == "NOAA":
+            real_content = raw_code.strip()
+            if 'NNNN' in raw_code:
+                real_content = raw_code.replace('NNNN', '').strip()
+                msg_meta['has_nnnn'] = True
+        
+        if real_content[-1] == '=':
+            real_content = real_content[:-1]
+            msg_meta['has_eq'] = True
+        msg_meta['striped_msg'] = real_content
+        msg_meta['parsed_msg'] = self.parse(real_content)
+        msg_meta['time_str'] = time_str
+        msg_meta['source'] = source
+            
+        return msg_meta
     
     def explain(self, msg: dict) -> str:
         return self.get_parser_from_msg(msg).explain(msg)
     
-    def translate(self, msg: dict, field: str) -> str:
-        return self.get_parser_from_msg(msg).translate(field)
+    def translate(self, msg: dict, field: str, content: str) -> str:
+        return self.get_parser_from_msg(msg).translate(field, content)
     
     def get_format(self, msg: dict) -> list:
         return self.get_parser_from_msg(msg).get_format()
@@ -66,12 +105,25 @@ class MessageParserManager:
                     else:
                         actual_field = field
                     if actual_field in msg:
-                        field_value = msg[actual_field]
-                        translation = self.translate(msg, actual_field)
+                        # 将头尾的\n替换为<br>
+
+                        # 处理头部换行符
+                        leading_n = len(msg[actual_field]) - len(msg[actual_field].lstrip('\n'))
+                        for _ in range(leading_n):
+                            raw_msg.append(("<br>",))
+
+                        # 处理中间内容(去除头尾换行符)
+                        field_value = msg[actual_field].strip('\n').replace('\n', '<br>')
+                        translation = self.translate(msg, actual_field, field_value)
                         if translation:
                             raw_msg.append((field_value, translation))
                         else:
                             raw_msg.append((field_value,))
+
+                        # 处理尾部换行符
+                        trailing_n = len(msg[actual_field]) - len(msg[actual_field].rstrip('\n'))
+                        for _ in range(trailing_n):
+                            raw_msg.append(("<br>",))
                         field_counter[field] += 1
                     else:
                         return

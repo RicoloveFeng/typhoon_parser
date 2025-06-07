@@ -2,7 +2,8 @@ from .message_parser import MessageParser
 
 class TCPQ_BABJ(MessageParser):
     def __init__(self):
-        super().__init__('TCPQ_BABJ')
+        super().__init__(['TCPQ40 BABJ'])
+
     
     def explain(self, msg: dict) -> str:
         ty_loc_tmpl = {
@@ -74,7 +75,7 @@ class TCPQ_BABJ(MessageParser):
         
         return '\n'.join(expl)
     
-    def get_translation(self) -> str:
+    def get_translation(self) -> dict:
         return {
             'type': '报文格式，表示基于台风卫星云图的发展趋势分析',
             'area': '报文涉及的区域，PQ=西北太平洋',

@@ -43,7 +43,7 @@ def parse_telecode(code: str) -> str:
 
 class WSCI_BABJ(MessageParser):
     def __init__(self):
-        super().__init__('WSCI_BABJ')
+        super().__init__(['WSCI40 BABJ'])
     
     def explain(self, msg: dict) -> str:
         begin_date_str = ""
@@ -58,7 +58,7 @@ class WSCI_BABJ(MessageParser):
             begin_date_str
         ])
     
-    def get_translation(self) -> str:
+    def get_translation(self) -> dict:
         return {
             'type': '报文格式，表示基于台风起编/停编报文',
             'area': '报文涉及的区域，CI=中国',

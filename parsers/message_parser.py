@@ -1,19 +1,31 @@
 from collections import defaultdict
 import re
+
+
 class MessageParser:
-    def __init__(self, msg_type: str):
-        self.msg_type = msg_type
-        
+    def __init__(self, supported_headers: list):
+        self.headers = supported_headers
+
+    def get_supported_headers(self) -> list:
+        """
+        Get supported headers for this parser, i.e. TTAAii CCCC
+        Shall init headers in __init__
+        """
+        return self.headers
+
     def parse(self, code: str) -> dict:
         """
         Read message code and parse it with message format
         
-        Duplication rule
+        Duplication rule:
         - To handle optional variable length fields, a field could show up more than once in format.
         - if a field is duplicated, then it will be recorded as 'field/n',
           where n is the number of times it is presented, counting from 0
         
           example: 'name' shows up 2 times, then first one is 'name', second one is 'name/1'
+
+        Format explanation: check docstring in get_format()
+
         :return: field -> raw value
         """
         code = code.strip()
@@ -22,8 +34,8 @@ class MessageParser:
         format_list = self.get_format()
         field_counter = defaultdict(int)
 
-        def parse_rule(rule_list, current_index, depth = 0):
-            nonlocal result 
+        def parse_rule(rule_list, current_index, depth=0):
+            nonlocal result
             i = 0
             while i < len(rule_list):
                 # print(f"dealing layer {depth}, {i}/{len(rule_list)}...")
@@ -61,6 +73,10 @@ class MessageParser:
                         if current_index == start:
                             raise ValueError(f"字段 {field} 未匹配到内容直到 {target_word}")
                         value = code[start:current_index]
+                    elif length_str == '$$':
+                        assert i == len(rule_list) - 1
+                        value = code[current_index:]
+                        current_index += len(value)
                     elif length_str == 'S':
                         start = current_index
                         while current_index < len(code) and not code[current_index].isspace():
@@ -91,29 +107,49 @@ class MessageParser:
         if index < len(code):
             print(f"Format cannot cover all message. Remaining message:#{code[index:]}#")
         return result
-    
-    def explain(self, msg: dict) -> dict:
+
+    def explain(self, msg: dict) -> str:
         """
         Explain every field.
         :return: field -> explanation
         """
         raise NotImplementedError
-    
+
     def get_translation(self) -> dict:
         """
         A translation dictionary to help translating message
         :return: field -> translation
         """
         raise NotImplementedError
-    
-    def translate(self, field: str) -> str:
+
+    def translate(self, field: str, content: str='') -> str:
         """
         Translate field to it's meaning
+        Translation could be:
+        - 'field': 'meaning'
+        - 'field': ('basic meaning', (('kw1', 'kw1 meaning'), ...))
+
+        for the second case, the result would be:
+        'basic meaning, kw1=kw1 meaning, kw2=kw2 meaning...'
         """
         field = field.split('/')[0]
-        return self.get_translation().get(field, '')
-        
-    
+        translation = self.get_translation().get(field, '')
+        # case 1
+        if type(translation) == str:
+            return translation
+        # case 2
+        basic = translation[0]
+        kws = translation[1]
+        showed_kws = []
+        for kw, kw_m in kws:
+            if 'X' in kw:
+                pattern = kw.replace('X', '[X0-9]')
+                if re.search(pattern, content):
+                    showed_kws.append((kw, kw_m))
+            elif kw in content:
+                showed_kws.append((kw, kw_m))
+        return f"{basic}, " + ", ".join(f"{kw}={kw_m}" for kw, kw_m in showed_kws)
+
     def get_format(self) -> list:
         """
         A message format text to help parsing
@@ -121,6 +157,7 @@ class MessageParser:
         - 'field:length': field name and it's length. 
             - When length is S, it means parsing until a whitespace.
             - When length is $, it means parsing until line break.
+            - When length is $$, it means parsing until end of message.
             - When length is -WORD, it means parsing until WORD.
         - [' 30KTS', ...]: optional, only process when message prefix matches the first token of the list.
             - It is actually a regex matching, but wrapped as rf'^{tokens[0]}'.
@@ -128,6 +165,3 @@ class MessageParser:
         - 'br': line break
         """
         raise NotImplementedError
-    
-    def get_type(self):
-        return self.msg_type

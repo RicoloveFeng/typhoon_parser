@@ -2,7 +2,7 @@ from .message_parser import MessageParser
 
 class WTPQ_BABJ(MessageParser):
     def __init__(self):
-        super().__init__('WTPQ_BABJ')
+        super().__init__(['WTPQ20 BABJ'])
     
     def explain(self, msg: dict) -> str:
         cat_expl = {
