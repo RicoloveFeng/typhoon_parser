@@ -11,7 +11,7 @@ class WDPN3x_PGTW(MessageParser):
         expl = [
             f"联合台风警报中心于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风预测推理公告",
             '...',
-            send_request(msg['reasoning'])
+            send_request(msg['summary'][1:] + msg['analysis']+"\n...\n"+msg['reasoning'])
         ]
         return '\n'.join(expl)
     
@@ -40,7 +40,7 @@ class WDPN3x_PGTW(MessageParser):
         msg_format = [
             'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
             'source:-SUBJ',
-            'title:-SUMMARY',
+            'title:-\nSUMMARY',
             'summary:-SATELLITE ANALYSIS, INITIAL POSITION AND',
             'analysis:-INITIAL WIND RADII BASIS',
             'iwrb:-CURRENT STEERING MECHANISM',

@@ -5,9 +5,12 @@ import json
 from parsers.TCPQ_BABJ import TCPQ_BABJ
 from parsers.WTPQ_BABJ import WTPQ_BABJ
 from parsers.WSCI_BABJ import WSCI_BABJ
+from parsers.WHCI_BABJ import WHCI_BABJ
 from parsers.TPPN1x_PGTW import TPPN1x_PGTW
 from parsers.WDPN3x_PGTW import WDPN3x_PGTW
 from parsers.WTPQ3x_RJTD import WTPQ3x_RJTD
+from parsers.TXPQ2x_KNES import TXPQ2x_KNES
+from parsers.WTPN2x_PGTW import WTPN2x_PGTW
 from parsers.message_parser import MessageParser
 from parsers.default_parser import DefaultParser
 
@@ -17,9 +20,12 @@ class MessageParserManager:
         self.add_parser(TCPQ_BABJ())
         self.add_parser(WTPQ_BABJ())
         self.add_parser(WSCI_BABJ())
+        self.add_parser(WHCI_BABJ())
         self.add_parser(TPPN1x_PGTW())
         self.add_parser(WDPN3x_PGTW())
         self.add_parser(WTPQ3x_RJTD())
+        self.add_parser(TXPQ2x_KNES())
+        self.add_parser(WTPN2x_PGTW())
 
     def add_parser(self, parser: MessageParser):
         for header in parser.get_supported_headers():

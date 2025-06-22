@@ -2,7 +2,7 @@ from .message_parser import MessageParser
 from .deepseek_client import send_request
 class WTPQ3x_RJTD(MessageParser):
     def __init__(self):
-        headers = [f"WTPQ3{x} RJTD" for x in range(4)]
+        headers = [f"WTPQ3{x} RJTD" for x in range(5)]
         super().__init__(headers)
 
     def explain(self, msg: dict) -> str:
@@ -20,7 +20,7 @@ class WTPQ3x_RJTD(MessageParser):
         return {
             'type': '报文格式，表示台风警告报文',
             'area': '报文涉及的区域，PQ=西北太平洋',
-            'ii': '报文类型编号，无具体含义',
+            'ii': '报文类型编号，在当前报文类型对应JMA的TD临时顺序',
             'msg_center': '报文发布单位，RJTD=日本气象厅',
             'msg_dd': '报文发布日期',
             'msg_hh': '报文发布小时',
@@ -36,12 +36,12 @@ class WTPQ3x_RJTD(MessageParser):
     
     def get_format(self) -> list:
         msg_format = [
-            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
+            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' CC', 'ws', 'ccx:3'], 'br',
             'title:$', 'br',
             'subtitle:$', 'br',
-            'general_comment:-2.',
-            'synoptic_situation:-3.',
-            'track_forecast:-4.',
+            'general_comment:-2.SYNOPTIC SITUATION',
+            'synoptic_situation:-3.TRACK FORECAST',
+            'track_forecast:-4.INTENSITY FORECAST',
             'intensity_forecast:-5.',
             'remarks:$$',
         ]

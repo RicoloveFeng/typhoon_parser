@@ -42,7 +42,7 @@ class WTPQ_BABJ(MessageParser):
             name_str,
             f"起报时间：世界协调时{msg['init_dd']}日{msg['init_hh']}时{msg['init_mm']}分",
             f"当前位置：{msg['ty_la']} {msg['ty_lo']}",
-            f"中心气压：{msg['wind_spd']}，最大风速：{msg['wind_spd']}",
+            f"中心气压：{msg['pressure']}，最大风速：{msg['wind_spd']}",
         ]
         if '30kts_winds' in msg:
             expl.append(f"七级风圈半径：东北方向{msg['30kts_NE_rad']}、东南方向{msg['30kts_SE_rad']}、西南方向{msg['30kts_SW_rad']}、西北方向{msg['30kts_NW_rad']}")
@@ -87,8 +87,8 @@ class WTPQ_BABJ(MessageParser):
             'init_hh': '起报时间-小时',
             'init_mm': '起报时间-分钟',
             '00hr': '当前时间',
-            'ty_la': '中心经度',
-            'ty_lo': '中心纬度',
+            'ty_la': '中心纬度',
+            'ty_lo': '中心经度',
             'pressure': '中心气压',
             'wind_spd': '中心附近最大风速',
             '30kts_winds': '七级风圈',
