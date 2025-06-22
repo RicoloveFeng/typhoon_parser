@@ -11,10 +11,10 @@ Output option:
 - `txt`: a text explaining the message. 
 - `print`: print to stdout.
 
+Some parsers require a translation server. See `parsers/deepseek_client.py`
+
 ## Supported message
-- TCPQ BABJ
-- WTPQ BABJ
-- WSCI BABJ
+See `parsers/`
 
 ## Reference
 - 韩瑞[等]. 全球台风报文TAC格式的编码规则解析[M]. B1. 气象出版社, 2024.
