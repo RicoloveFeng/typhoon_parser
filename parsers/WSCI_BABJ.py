@@ -51,7 +51,7 @@ class WSCI_BABJ(MessageParser):
             MM, dd, hh = [int(digits[2:]) for digits in msg['telecode2'].strip().split(' ')]
             begin_date_str = f"，{MM}月{dd}日{hh:2}时"
         return '\n'.join([
-            f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风编号报文",
+            self.gen_header_expl(msg, "台风编号报文"),
             f"发往沈阳/武汉/上海/成都/广州/太原/西安/天津/深圳/济南/郑州/北京",
             parse_telecode(msg['telecode']),
             "发自中央气象台" +  

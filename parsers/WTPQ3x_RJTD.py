@@ -11,7 +11,7 @@ class WTPQ3x_RJTD(MessageParser):
         before_translate = msg["general_comment"] + msg["synoptic_situation"] + msg["track_forecast"] + msg["intensity_forecast"] + msg["remarks"]
         after_translate = send_request(before_translate)
         expl = [
-            f"日本气象厅于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布热带气旋预测推理公告",
+            self.gen_header_expl(msg, "热带气旋预测推理公告"),
             after_translate
         ]
         return '\n'.join(expl)

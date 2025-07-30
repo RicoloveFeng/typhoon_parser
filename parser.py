@@ -1,6 +1,7 @@
 import argparse
 from collections import defaultdict
-import json 
+import json
+import logging 
 
 from parsers.TCPQ_BABJ import TCPQ_BABJ
 from parsers.WTPQ_BABJ import WTPQ_BABJ
@@ -37,11 +38,18 @@ class MessageParserManager:
         return parser
 
     def get_parser_from_msg(self, msg: dict) -> MessageParser:
+        if "msg_text" in msg:  # Only field of default
+            return DefaultParser()
         header = f"{msg['type']}{msg['area']}{msg['ii']} {msg['msg_center']}"
         return self.get_parser_from_code(header)
 
     def parse(self, code: str) -> dict:
-        return self.get_parser_from_code(code).parse(code)
+        try:
+            res = self.get_parser_from_code(code).parse(code)
+        except:
+            logging.error(f"Cannot parse: {code}")
+            res = DefaultParser().parse(code)
+        return res
     
     def parse_from_raw(self, raw_msg: list) -> dict:
         """

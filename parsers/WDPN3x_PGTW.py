@@ -6,12 +6,30 @@ class WDPN3x_PGTW(MessageParser):
         super().__init__(headers)
 
     def explain(self, msg: dict) -> str:
-        # H.[]REMARKS: ...
-        # 把前面的H.[]删除
+        # title: SUBJ/PROGNOSTIC REASONING FOR TROPICAL DEPRESSION 02W (SEPAT) WARNING NR 011//
+
+        title = msg['title']
+        # 提取FOR后面的对象
+        start_idx = title.find('FOR ') + 4
+        end_idx = max(title.find(' WARNING'), title.find('\nWARNING'))
+        target = title[start_idx:end_idx].strip()
+
+        # 提取最后的编号
+        nr_idx = max(title.find('NR '), title.find('NR\n')) + 3
+        nr_end = title.find('//', nr_idx)
+        warning_nr = title[nr_idx:nr_end].strip()
+
+
         expl = [
-            f"联合台风警报中心于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风预测推理公告",
+            self.gen_header_expl(msg, "预测推理公告"),
             '...',
-            send_request(msg['summary'][1:] + msg['analysis']+"\n...\n"+msg['reasoning'])
+            f'针对{self.translate_common_terms(target)}的预测推理公告 编号{warning_nr}',
+            '备注/',
+            '1. 供气象研究者阅读。',
+            '2. 6小时综述与预报。',
+            send_request(msg['summary'][1:] + msg['analysis'] + msg['iwrb'] + msg['steering'] + msg['dvorak'] + msg['env'] + msg['confidence']) + 
+            "\n\n" + 
+            send_request(msg['reasoning'])
         ]
         return '\n'.join(expl)
     

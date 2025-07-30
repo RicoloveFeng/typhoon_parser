@@ -18,7 +18,7 @@ class WHCI_BABJ(MessageParser):
         }
         landing_spd = msg['spd'][1:-1]
         return '\n'.join([
-            f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风登陆报文",
+            self.gen_header_expl(msg, "台风登陆报文"),
             f"{cat_expl[msg['cat']]}{msg['name']}（编号{msg['dom_num']}，国际编号{msg['inter_num']}）已登陆{msg['place']}",
             f"登陆时间为世界协调时{msg['land_dd']}日{msg['land_hh']}时{msg['land_mm']}分，登陆风速{landing_spd}",
         ])

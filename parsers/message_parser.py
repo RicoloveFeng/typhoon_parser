@@ -59,7 +59,7 @@ class MessageParser:
                         # 全文最后，忽略换行
                         pass
                     else:
-                        raise ValueError("未找到换行符")
+                        raise ValueError(f"未找到换行符:{rule_list}, {current_index}, {code}")
                     # print('br')
                 else:
                     field, length_str = rule.split(':')
@@ -165,3 +165,34 @@ class MessageParser:
         - 'br': line break
         """
         raise NotImplementedError
+
+    def gen_header_expl(self, msg: dict, message_cat: str) -> str:
+        """
+        Generate header explanation
+        :param msg: message dict
+        :param message_cat: expl of TTAAii
+        """
+        CCCC_list = {
+            "BABJ": "中央气象台",
+            "PGTW": "联合台风警报中心",
+            "RJTD": "日本气象厅",
+            "KNES": "NOAA卫星服务部"
+        }
+        TTAAii = f"{msg['type']}{msg['area']}{msg['ii']}"
+        CCCC = msg['msg_center']
+        return f"{CCCC_list[CCCC]}({CCCC})于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布{message_cat}({TTAAii})"
+    
+    def translate_common_terms(self, text: str) -> str:
+        terms = {
+            'SUBTROPICAL DEPRESSION': '副热带低压',
+            'REMNANTS OF TROPICAL DEPRESSION': '热带低压残余',
+            'TROPICAL DISTURBANCE': '热带扰动',
+            'TROPICAL DEPRESSION': '热带低压',
+            'TROPICAL STORM': '热带风暴',
+            'TYPHOON': '台风',
+            'EXTRATROPICAL CYCLONE': '温带气旋'
+        }
+        for term, translation in terms.items():
+            text = text.replace(term, translation)
+        return text
+    

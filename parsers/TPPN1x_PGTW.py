@@ -19,11 +19,23 @@ class TPPN1x_PGTW(MessageParser):
             F_res.append("德法不适用")
         elif len(curr_res) >= 2:
             # TX.X/Y.Y -> FT X.X CI Y.Y
-            F_res.append(f"FT {curr_res[0][1:]}")
+            # XTX.X/Y.Y -> XT X.X CI Y.Y
+            if curr_res[0][0] == 'T':
+                F_res.append(f"FT {curr_res[0][1:]}")
+            elif curr_res[0][0] == 'X':
+                F_res.append(f"XT {curr_res[0][2:]}")
+            elif curr_res[0][0] == 'S':
+                F_res.append(f"ST {curr_res[0][2:]}")
+            else:
+                F_res.append(curr_res[0])
+                
             F_res.append(f"CI {curr_res[1]}")
             if len(curr_res) == 4:
-                F_res.append(f"24小时趋势 {trend[curr_res[2][0]]}({curr_res[2][1:]})")
-            if len(F_split) > 1:
+                F_res.append(f"{curr_res[3][:2]}小时趋势 {trend[curr_res[2][0]]}({curr_res[2][1:]})")
+            if "INIT OBS" in F:
+                # T1.0/1.0/INIT OBS\n
+                F_res.append("观测初报")
+            elif len(F_split) > 1:
                 stt = ''.join(F_split[1:])
                 stt_res = stt.split('/')
                 F_res.append(f"3小时短期趋势 {trend[stt_res[0][4]]}({stt_res[0][5:]})")
@@ -32,8 +44,8 @@ class TPPN1x_PGTW(MessageParser):
         # H.[]REMARKS: ...
         # 把前面的H.[]删除
         expl = [
-            f"联合台风警报中心于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风发展报文",
-            f"A. 分析对象：{A}",
+            self.gen_header_expl(msg, "台风发展报文"),
+            f"A. 分析对象：{self.translate_common_terms(A)}",
             "...",
             f"F. 德法结论：{', '.join(F_res)}",
             "...",
@@ -66,7 +78,8 @@ class TPPN1x_PGTW(MessageParser):
                 ('WX.X', '减弱指数'),
                 ('HRS', '计算强度的时间间隔'),
                 ('STT', '短期趋势'),
-                ('XT', '后热带气旋'))),
+                ('XT', '温带气旋'),
+                ('ST', '副热带气旋'))),
             'G': ('使用的卫星图像', (
                 ('IR', '红外'),
                 ('EIR', '增强红外'),

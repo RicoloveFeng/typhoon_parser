@@ -19,7 +19,7 @@ class TCPQ_BABJ(MessageParser):
             '3': '逐渐增强',
             '4': '明显增强',
             '9': '先前未观测，无法提供变化趋势',
-            '/': '【未定】',
+            '/': '变化趋势不适用',
         }
         time_intv_expl = {
             '0': '<1h',
@@ -32,11 +32,11 @@ class TCPQ_BABJ(MessageParser):
             '7': '15-18h',
             '8': '18-21h',
             '9': '21-30h',
-            '/': '【未定】',
+            '/': '【不适用】',
         }
         
         expl = [
-            f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风发展报文",
+            self.gen_header_expl(msg, "台风发展报文"),
             f"观测时间：世界协调时{msg['ob_dd']}日{msg['ob_hh']}时{msg['ob_mm']}0分",
         ]
         
@@ -54,7 +54,7 @@ class TCPQ_BABJ(MessageParser):
             
             ci_raw = msg['ci'+idx_string]
             if ci_raw == '//':
-                ci_str = 'CI值不明'
+                ci_str = 'CI值不适用'
             elif ci_raw == '99':
                 ci_str = '该气旋将逐渐转为温带气旋'
             else:

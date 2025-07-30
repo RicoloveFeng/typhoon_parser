@@ -19,13 +19,15 @@ class TXPQ2x_KNES(MessageParser):
             F_res.append(f"CI {curr_res[1]}")
         elif len(curr_res) == 1 and curr_res[0] == "OVERLAND":
             F_res.append("环流中心位于陆地，德法不适用")
+        elif F == "TOO WEAK":
+            F_res.append("系统过弱，德法不适用")
         else:
             F_res.append("解析失败")
         # H.[][]REMARKS: ...
         # 把前面的H.[][]删除
         expl = [
-            f"NOAA卫星服务部于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风发展报文",
-            f"A.  分析对象：{A}",
+            self.gen_header_expl(msg, "台风发展报文"),
+            f"A.  分析对象：{self.translate_common_terms(A)}",
             "...",
             f"F.  德法结论：{', '.join(F_res)}",
             "...",
@@ -58,7 +60,8 @@ class TXPQ2x_KNES(MessageParser):
                 ('WX.X', '减弱指数'),
                 ('HRS', '计算强度的时间间隔'),
                 ('STT', '短期趋势'),
-                ('XT', '后热带气旋'))),
+                ('XT', '温带气旋'),
+                ('ST', '副热带气旋'))),
             'G': ('使用的卫星图像', (
                 ('IR', '红外'),
                 ('EIR', '增强红外'),

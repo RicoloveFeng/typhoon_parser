@@ -38,7 +38,7 @@ class WTPQ_BABJ(MessageParser):
         else:
             name_str = f"{cat_expl[msg['cat']]}{msg['name']}，编号{msg['dom_num']}，国际编号{msg['inter_num']}"
         expl = [
-            f"中央气象台于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布台风综合预报报文",
+            self.gen_header_expl(msg, "台风综合预报报文"),
             name_str,
             f"起报时间：世界协调时{msg['init_dd']}日{msg['init_hh']}时{msg['init_mm']}分",
             f"当前位置：{msg['ty_la']} {msg['ty_lo']}",
@@ -50,8 +50,12 @@ class WTPQ_BABJ(MessageParser):
             expl.append(f"十级风圈半径：东北方向{msg['50kts_NE_rad']}、东南方向{msg['50kts_SE_rad']}、西南方向{msg['50kts_SW_rad']}、西北方向{msg['50kts_NW_rad']}")
         if '64kts_winds' in msg:
             expl.append(f"十二级风圈半径：东北方向{msg['64kts_NE_rad']}、东南方向{msg['64kts_SE_rad']}、西南方向{msg['64kts_SW_rad']}、西北方向{msg['64kts_NW_rad']}")
+        
+        if msg['move_dir'] == 'ALMOST':
+            expl.append("移向移速：回旋少动")
+        else:
+            expl.append(f"移向移速：以{msg['move_spd']}向{move_dir_expl[msg['move_dir']]}移动")
             
-        expl.append(f"移向移速：以{msg['move_spd']}向{move_dir_expl[msg['move_dir']]}移动")
         if 'p+xxhr' in msg:
             expl.append(f"路径预报：")
         for i in range(10):

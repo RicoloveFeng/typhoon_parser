@@ -14,11 +14,11 @@ class WTPN2x_PGTW(MessageParser):
         if msg.get('subj'):
             target = re.search(r'\((.*?)\)', msg['subj']).group(1)
             target = target.replace('INVEST', '扰动')
-            subj = f"针对{target} 的热带气旋形成警告" if 'CANCEL' not in msg['subj'] else f"取消{target} 的热带气旋形成警告"
+            subj = f"针对{self.translate_common_terms(target)} 的热带气旋形成警告" if 'CANCEL' not in msg['subj'] else f"取消{self.translate_common_terms(target)} 的热带气旋形成警告"
         else:
             subj = ""
         expl = [
-            f"联合台风警报中心于世界协调时{msg['msg_dd']}日{msg['msg_hh']}时{msg['msg_mm']}分发布热带气旋形成警告",
+            self.gen_header_expl(msg, "热带气旋形成警告"),
             '...',
             subj,
             send_request(msg['rmks'])
@@ -44,7 +44,7 @@ class WTPN2x_PGTW(MessageParser):
 
     def get_format(self) -> list:
         msg_format = [
-            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
+                'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' COR', 'ws', 'cor:3'], 'br',
             ['MSGID/', 'source:$', 'br'],
             ['SUBJ/', 'subj:$', 'br'],
             ['REF/', 'ref:$', 'br'],
