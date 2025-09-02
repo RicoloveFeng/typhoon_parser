@@ -20,13 +20,21 @@ jobs:
       # 切换到abpw分支，如果不存在则创建
       - name: Switch to abpw branch or create it
         run: |
-          git fetch origin abpw || true
-          
-          if git rev-parse --verify abpw; then
-            echo "Branch abpw exists, checking it out"
-            git checkout abpw
+          # 检查远程是否存在abpw分支
+          if git ls-remote --heads origin abpw | grep -q abpw; then
+            echo "Remote branch abpw exists"
+            # 检查本地是否已有abpw分支
+            if git rev-parse --verify abpw; then
+              echo "Local branch abpw exists, checking it out"
+              git checkout abpw
+            else
+              echo "Local branch abpw does not exist, creating it from remote"
+              git checkout -b abpw origin/abpw
+            fi
+            # 拉取远程最新更改
+            git pull origin abpw
           else
-            echo "Branch abpw does not exist, creating it"
+            echo "Branch abpw does not exist remotely, creating new local branch"
             git checkout --orphan abpw  # 创建一个无历史的新分支
             git rm -rf .  # 清除工作区内容，从空白开始
           fi
