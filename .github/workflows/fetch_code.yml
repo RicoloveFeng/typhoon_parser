@@ -1,0 +1,53 @@
+name: Fetch ABPW Data
+
+# 触发条件：每10分钟自动运行，且允许手动触发
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # 每10分钟运行一次
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  fetch-and-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 检出代码仓库
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 确保获取所有分支历史
+      
+      # 切换到abpw分支，如果不存在则创建
+      - name: Switch to abpw branch or create it
+        run: |
+          if git rev-parse --verify abpw; then
+            echo "Branch abpw exists, checking it out"
+            git checkout abpw
+          else
+            echo "Branch abpw does not exist, creating it"
+            git checkout --orphan abpw  # 创建一个无历史的新分支
+            git rm -rf .  # 清除工作区内容，从空白开始
+          fi
+      
+      # 获取文件内容
+      - name: Fetch ABPW data
+        run: |
+          curl -o abpw10.txt https://www.metoc.navy.mil/jtwc/products/abpwweb.txt
+      
+      # 配置Git用户信息
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+      
+      # 提交更改
+      - name: Commit and push changes
+        run: |
+          git add abpw10.txt
+          # 检查是否有更改
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update ABPW data: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            git push origin abpw
+          fi
