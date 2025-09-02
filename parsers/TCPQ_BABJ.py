@@ -65,12 +65,14 @@ class TCPQ_BABJ(MessageParser):
             if dir == '//':
                 dir_spd_str = "无移速与移向信息"
             else:
-                dir_spd_str = f"将以{int(spd)}节的速度向{int(dir)*10}°方向移动"
+                dir_spd_str = f"过去一段时间以{int(spd)}节的速度向{int(dir)*10}°方向移动"
+                
+            time_intv_str = "" if time_intv == '/' else f"计算以上运动的时间间隔为{time_intv_expl[time_intv]}"
                 
             expl.extend([
                 f"热带气旋{name}(编号{ty_num})，当前中心位于"+ty_loc_tmpl[quad].format(float(ty_lo)/10, float(ty_la)/10),
-                f"{ci_str}，{dir_spd_str}，强度{ty_intense_expl[intense]}",
-                f"计算运动的时间间隔为{time_intv_expl[time_intv]}" 
+                f"{ci_str}，{dir_spd_str}，强度{ty_intense_expl[intense]}。",
+                time_intv_str
             ])
         
         return '\n'.join(expl)

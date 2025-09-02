@@ -6,8 +6,38 @@ class TPPN1x_PGTW(MessageParser):
         super().__init__(headers)
 
     def explain(self, msg: dict) -> str:
-        # \nA. TRO...
+        # \nA. TRO... 
+        # TROPICAL DISTURBANCE 90W (E OF LUZON)
         A = msg['A'][4:].strip()
+        geo_ref = A.split('(')[1].split(')')[0]
+        geo_info = geo_ref.split(' OF ')
+        if len(geo_info) == 2:
+            geo_dir, geo_loc = geo_info
+            dirs = {
+                'N': '北',
+                'NE': '东北',
+                'E': '东',
+                'SE': '东南',
+                'S': '南',
+                'SW': '西南',
+                'W': '西',
+                'NW': '西北',
+            }
+            locs = {
+                'LUZON': '吕宋岛',
+                'HAINAN': '海南岛',
+                'GUAM': '关岛',
+                'IOWTO': '硫磺岛',
+                'WAKE ISLAND': '威克岛',
+            }
+            A = f"{A.split('(')[0]} ({locs.get(geo_loc, geo_loc)}{dirs.get(geo_dir, geo_dir)}方向)"
+        # else: geo_ref is actually cyclone name
+        
+        # B. 01/0030Z
+        B = msg['B'][3:].strip()
+        obs_day, obs_hour = B.split('/')
+        obs_hour, obs_min = obs_hour[:2], obs_hour[2:4]
+        
         # T3.0/...
         F = msg['F'][3:].strip()
         F_res = []
@@ -38,7 +68,7 @@ class TPPN1x_PGTW(MessageParser):
             elif len(F_split) > 1:
                 stt = ''.join(F_split[1:])
                 stt_res = stt.split('/')
-                F_res.append(f"3小时短期趋势 {trend[stt_res[0][4]]}({stt_res[0][5:]})")
+                F_res.append(f"{int(stt_res[1][:2])}小时短期趋势 {trend[stt_res[0][4]]}({stt_res[0][5:]})")
         else:
             F_res.append("解析失败")
         # H.[]REMARKS: ...
@@ -46,6 +76,7 @@ class TPPN1x_PGTW(MessageParser):
         expl = [
             self.gen_header_expl(msg, "台风发展报文"),
             f"A. 分析对象：{self.translate_common_terms(A)}",
+            f"B. 观测时间：{obs_day}日{obs_hour}时{obs_min}分（世界协调时）",
             "...",
             f"F. 德法结论：{', '.join(F_res)}",
             "...",
@@ -105,7 +136,7 @@ class TPPN1x_PGTW(MessageParser):
             'F:-G.',
             'G:-H.',
             'H:-I.',
-            'I:-\n\n\n',
+            ['I.', 'I:-\n\n\n',],
             'issuer:$$'
         ]
         return msg_format

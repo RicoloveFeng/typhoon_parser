@@ -12,6 +12,7 @@ from parsers.WDPN3x_PGTW import WDPN3x_PGTW
 from parsers.WTPQ3x_RJTD import WTPQ3x_RJTD
 from parsers.TXPQ2x_KNES import TXPQ2x_KNES
 from parsers.WTPN2x_PGTW import WTPN2x_PGTW
+from parsers.ABPW10_PGTW import ABPW10_PGTW
 from parsers.message_parser import MessageParser
 from parsers.default_parser import DefaultParser
 
@@ -27,6 +28,7 @@ class MessageParserManager:
         self.add_parser(WTPQ3x_RJTD())
         self.add_parser(TXPQ2x_KNES())
         self.add_parser(WTPN2x_PGTW())
+        self.add_parser(ABPW10_PGTW())
 
     def add_parser(self, parser: MessageParser):
         for header in parser.get_supported_headers():
@@ -46,8 +48,9 @@ class MessageParserManager:
     def parse(self, code: str) -> dict:
         try:
             res = self.get_parser_from_code(code).parse(code)
-        except:
+        except Exception as e:
             logging.error(f"Cannot parse: {code}")
+            logging.error(e)
             res = DefaultParser().parse(code)
         return res
     

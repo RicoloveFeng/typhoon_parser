@@ -186,6 +186,8 @@ class MessageParser:
         terms = {
             'SUBTROPICAL DEPRESSION': '副热带低压',
             'REMNANTS OF TROPICAL DEPRESSION': '热带低压残余',
+            'REMNANTS OF TROPICAL STORM': '热带风暴残余',
+            'REMNANTS OF TYPHOON': '台风残余',
             'TROPICAL DISTURBANCE': '热带扰动',
             'TROPICAL DEPRESSION': '热带低压',
             'TROPICAL STORM': '热带风暴',

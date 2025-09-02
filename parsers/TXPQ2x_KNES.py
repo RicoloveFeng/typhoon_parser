@@ -7,6 +7,9 @@ class TXPQ2x_KNES(MessageParser):
 
     def explain(self, msg: dict) -> str:
         A = msg['A'][4:].strip()
+        B = msg['B'][3:].strip()
+        obs_day, obs_hour = B.split('/')
+        obs_hour, obs_min = obs_hour[:2], obs_hour[2:4]
         F = msg['F'][4:].strip()
         F_res = []
         trend = {'S': '维持', 'D': '增强', 'W': '减弱'}
@@ -21,6 +24,8 @@ class TXPQ2x_KNES(MessageParser):
             F_res.append("环流中心位于陆地，德法不适用")
         elif F == "TOO WEAK":
             F_res.append("系统过弱，德法不适用")
+        elif F == "EXTRATROPICAL":
+            F_res.append("已变性为温带气旋")
         else:
             F_res.append("解析失败")
         # H.[][]REMARKS: ...
@@ -28,6 +33,7 @@ class TXPQ2x_KNES(MessageParser):
         expl = [
             self.gen_header_expl(msg, "台风发展报文"),
             f"A.  分析对象：{self.translate_common_terms(A)}",
+            f"B. 观测时间：{obs_day}日{obs_hour}时{obs_min}分（世界协调时）",
             "...",
             f"F.  德法结论：{', '.join(F_res)}",
             "...",

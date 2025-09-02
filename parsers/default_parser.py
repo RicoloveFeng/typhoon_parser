@@ -5,7 +5,7 @@ class DefaultParser(MessageParser):
         super().__init__([])
 
     def explain(self, msg: dict) -> str:
-        return ""
+        return "解析失败，可能是报文不完整或出现了超出过往格式的报文"
 
     def get_translation(self) -> dict:
         return {}
