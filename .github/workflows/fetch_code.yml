@@ -20,6 +20,8 @@ jobs:
       # 切换到abpw分支，如果不存在则创建
       - name: Switch to abpw branch or create it
         run: |
+          git fetch origin abpw || true
+          
           if git rev-parse --verify abpw; then
             echo "Branch abpw exists, checking it out"
             git checkout abpw
