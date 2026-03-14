@@ -11,5 +11,5 @@ class DefaultParser(MessageParser):
         return {}
 
     def get_format(self) -> list:
-        return ['type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
+        return ['type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' COR', 'ws', 'cor:3'], 'br',
                 'msg_text:$$']

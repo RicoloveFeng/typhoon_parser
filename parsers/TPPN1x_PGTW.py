@@ -1,5 +1,36 @@
 from .message_parser import MessageParser
 from .deepseek_client import send_request
+
+locs = {
+    'LUZON': '吕宋岛',
+    'HAINAN': '海南岛',
+    'GUAM': '关岛',
+    'IWO TO': '硫磺岛',
+    'WAKE ISLAND': '威克岛',
+    'OKINAWA': '冲绳岛',
+    'MANILA': '马尼拉',
+    'SPRATLY ISLANDS': '南沙群岛',
+    'YAP': '雅浦岛',
+    'PALAU': '帕劳岛',
+    'TAIWAN': '台湾岛',
+    'MINDANAO': '棉兰老岛',
+    'PANAY' : '班乃岛',
+    'PALAWAN': '巴拉望岛',
+    'SAMAR ISLAND': '萨马岛',
+    'MASBATE ISLAND': '马斯巴特岛',
+}
+
+dirs = {
+    'N': '北',
+    'NE': '东北',
+    'E': '东',
+    'SE': '东南',
+    'S': '南',
+    'SW': '西南',
+    'W': '西',
+    'NW': '西北',
+}
+
 class TPPN1x_PGTW(MessageParser):
     def __init__(self):
         headers = [f"TPPN1{x} PGTW" for x in range(10)]
@@ -10,27 +41,16 @@ class TPPN1x_PGTW(MessageParser):
         # TROPICAL DISTURBANCE 90W (E OF LUZON)
         A = msg['A'][4:].strip()
         geo_ref = A.split('(')[1].split(')')[0]
-        geo_info = geo_ref.split(' OF ')
-        if len(geo_info) == 2:
-            geo_dir, geo_loc = geo_info
-            dirs = {
-                'N': '北',
-                'NE': '东北',
-                'E': '东',
-                'SE': '东南',
-                'S': '南',
-                'SW': '西南',
-                'W': '西',
-                'NW': '西北',
-            }
-            locs = {
-                'LUZON': '吕宋岛',
-                'HAINAN': '海南岛',
-                'GUAM': '关岛',
-                'IOWTO': '硫磺岛',
-                'WAKE ISLAND': '威克岛',
-            }
-            A = f"{A.split('(')[0]} ({locs.get(geo_loc, geo_loc)}{dirs.get(geo_dir, geo_dir)}方向)"
+        if 'OVER' in geo_ref:  # OVER LUZON
+            geo_info = geo_ref.split()
+            if len(geo_info) == 2:
+                geo_loc = geo_info[1]
+                A = f"{A.split('(')[0]} ({locs.get(geo_loc, geo_loc)}上空)"
+        elif ' OF ' in geo_ref:  # E OF LUZON
+            geo_info = geo_ref.split(' OF ')
+            if len(geo_info) == 2:
+                geo_dir, geo_loc = geo_info
+                A = f"{A.split('(')[0]} ({locs.get(geo_loc, geo_loc)}{dirs.get(geo_dir, geo_dir)}方向)"
         # else: geo_ref is actually cyclone name
         
         # B. 01/0030Z
@@ -45,21 +65,28 @@ class TPPN1x_PGTW(MessageParser):
         F_split = F.split(' ')
         curr = F_split[0]
         curr_res = curr.split('/')
+        
         if F == "N/A":
             F_res.append("德法不适用")
         elif len(curr_res) >= 2:
             # TX.X/Y.Y -> FT X.X CI Y.Y
             # XTX.X/Y.Y -> XT X.X CI Y.Y
             if curr_res[0][0] == 'T':
-                F_res.append(f"FT {curr_res[0][1:]}")
+                ft = curr_res[0][1:]
+                dvorak_spd = self.dvorak_kts(ft)
+                dvorak_spd_str = f"(~{dvorak_spd}kt)" if dvorak_spd else ""
+                F_res.append(f"FT {curr_res[0][1:]}{dvorak_spd_str}")
             elif curr_res[0][0] == 'X':
                 F_res.append(f"XT {curr_res[0][2:]}")
             elif curr_res[0][0] == 'S':
                 F_res.append(f"ST {curr_res[0][2:]}")
             else:
                 F_res.append(curr_res[0])
-                
-            F_res.append(f"CI {curr_res[1]}")
+
+            ci = curr_res[1]
+            dvorak_spd = self.dvorak_kts(ci)
+            dvorak_spd_str = f"(~{dvorak_spd}kt)" if dvorak_spd else ""
+            F_res.append(f"CI {curr_res[1]}{dvorak_spd_str}")
             if len(curr_res) == 4:
                 F_res.append(f"{curr_res[3][:2]}小时趋势 {trend[curr_res[2][0]]}({curr_res[2][1:]})")
             if "INIT OBS" in F:
@@ -81,7 +108,9 @@ class TPPN1x_PGTW(MessageParser):
             f"F. 德法结论：{', '.join(F_res)}",
             "...",
             "H. " + send_request(msg['H'][3:]),
-            "..."
+            "...",
+            self.ai_generated_tips("H段德法分析")
+            
         ]
         return '\n'.join(expl)
     
@@ -141,3 +170,11 @@ class TPPN1x_PGTW(MessageParser):
         ]
         return msg_format
         
+    def get_location_if_exists(self, msg: dict) -> list:
+        C = msg['C'].strip()
+        D = msg['D'].strip()
+        if 'X' in C:
+            return []
+        lat = C.split()[1][:-1]
+        lon = D.split()[1][:-1]
+        return [lat, lon]

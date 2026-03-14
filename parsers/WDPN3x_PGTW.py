@@ -23,13 +23,14 @@ class WDPN3x_PGTW(MessageParser):
         expl = [
             self.gen_header_expl(msg, "预测推理公告"),
             '...',
-            f'针对{self.translate_common_terms(target)}的预测推理公告 编号{warning_nr}',
+            f'针对{self.translate_common_terms(target)}第{warning_nr}号警告的预测推理公告',
             '备注/',
             '1. 供气象研究者阅读。',
             '2. 6小时综述与预报。',
             send_request(msg['summary'][1:] + msg['analysis'] + msg['iwrb'] + msg['steering'] + msg['dvorak'] + msg['env'] + msg['confidence']) + 
             "\n\n" + 
-            send_request(msg['reasoning'])
+            send_request(msg['reasoning']),
+            self.ai_generated_tips()
         ]
         return '\n'.join(expl)
     

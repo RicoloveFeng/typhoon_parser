@@ -12,7 +12,8 @@ class WTPQ3x_RJTD(MessageParser):
         after_translate = send_request(before_translate)
         expl = [
             self.gen_header_expl(msg, "热带气旋预测推理公告"),
-            after_translate
+            after_translate,
+            self.ai_generated_tips(),
         ]
         return '\n'.join(expl)
     

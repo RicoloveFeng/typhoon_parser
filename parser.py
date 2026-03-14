@@ -13,6 +13,7 @@ from parsers.WTPQ3x_RJTD import WTPQ3x_RJTD
 from parsers.TXPQ2x_KNES import TXPQ2x_KNES
 from parsers.WTPN2x_PGTW import WTPN2x_PGTW
 from parsers.ABPW10_PGTW import ABPW10_PGTW
+from parsers.IUCC10_RJTD import IUCC10_RJTD
 from parsers.message_parser import MessageParser
 from parsers.default_parser import DefaultParser
 
@@ -29,6 +30,7 @@ class MessageParserManager:
         self.add_parser(TXPQ2x_KNES())
         self.add_parser(WTPN2x_PGTW())
         self.add_parser(ABPW10_PGTW())
+        self.add_parser(IUCC10_RJTD())
 
     def add_parser(self, parser: MessageParser):
         for header in parser.get_supported_headers():
@@ -42,7 +44,10 @@ class MessageParserManager:
     def get_parser_from_msg(self, msg: dict) -> MessageParser:
         if "msg_text" in msg:  # Only field of default
             return DefaultParser()
-        header = f"{msg['type']}{msg['area']}{msg['ii']} {msg['msg_center']}"
+        if 'data' in msg:
+            header = f"{msg['type']}{msg['data']}{msg['area']}{msg['ii']} {msg['msg_center']}"
+        else:
+            header = f"{msg['type']}{msg['area']}{msg['ii']} {msg['msg_center']}"
         return self.get_parser_from_code(header)
 
     def parse(self, code: str) -> dict:
@@ -76,6 +81,8 @@ class MessageParserManager:
             if 'NNNN' in raw_code:
                 real_content = raw_code.replace('NNNN', '').strip()
                 msg_meta['has_nnnn'] = True
+        elif source == "WIS":
+            real_content = raw_code.strip()
         
         if real_content[-1] == '=':
             real_content = real_content[:-1]
@@ -95,6 +102,9 @@ class MessageParserManager:
     
     def get_format(self, msg: dict) -> list:
         return self.get_parser_from_msg(msg).get_format()
+    
+    def get_location_if_exists(self, msg: dict) -> list:
+        return self.get_parser_from_msg(msg).get_location_if_exists(msg)
     
     def reconstruct_message(self, msg: dict) -> list:
         expl = self.explain(msg)

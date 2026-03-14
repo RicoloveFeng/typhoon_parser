@@ -21,7 +21,8 @@ class WTPN2x_PGTW(MessageParser):
             self.gen_header_expl(msg, "热带气旋形成警告"),
             '...',
             subj,
-            send_request(msg['rmks'])
+            send_request(msg['rmks']),
+            self.ai_generated_tips()
         ]
         return '\n'.join(expl)
 
@@ -29,7 +30,7 @@ class WTPN2x_PGTW(MessageParser):
         return {
             'type': '报文格式，表示热带气旋形成警告',
             'area': '报文涉及的区域，PN=北太平洋',
-            'ii': '报文类型编号，无具体含义',
+            'ii': '报文类型编号，2x表示TCFA',
             'msg_center': '报文发布单位，PGTW=联合台风警报中心',
             'msg_dd': '报文发布日期',
             'msg_hh': '报文发布小时',

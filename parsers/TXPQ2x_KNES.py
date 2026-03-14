@@ -18,8 +18,14 @@ class TXPQ2x_KNES(MessageParser):
         curr_res = curr.split('/')
         if len(curr_res) >= 2:
             # TX.X/Y.Y -> FT X.X CI Y.Y
-            F_res.append(f"FT {curr_res[0][1:]}")
-            F_res.append(f"CI {curr_res[1]}")
+            ft = curr_res[0][1:]
+            dvorak_spd = self.dvorak_kts(ft)
+            dvorak_spd_str = f"(~{dvorak_spd}kt)" if dvorak_spd else ""
+            F_res.append(f"FT {curr_res[0][1:]}{dvorak_spd_str}")
+            ci = curr_res[1]
+            dvorak_spd = self.dvorak_kts(ci)
+            dvorak_spd_str = f"(~{dvorak_spd}kt)" if dvorak_spd else ""
+            F_res.append(f"CI {curr_res[1]}{dvorak_spd_str}")
         elif len(curr_res) == 1 and curr_res[0] == "OVERLAND":
             F_res.append("环流中心位于陆地，德法不适用")
         elif F == "TOO WEAK":
@@ -38,7 +44,8 @@ class TXPQ2x_KNES(MessageParser):
             f"F.  德法结论：{', '.join(F_res)}",
             "...",
             "H.  " + send_request(msg['H'][4:]),
-            "..."
+            "...",
+            self.ai_generated_tips("H段德法分析")
         ]
         return '\n'.join(expl)
     
@@ -99,3 +106,12 @@ class TXPQ2x_KNES(MessageParser):
         ]
         return msg_format
         
+    def get_location_if_exists(self, msg: dict) -> list:
+        C = msg['C'].strip()
+        D = msg['D'].strip()
+        if 'X' in C:
+            return []
+        lat = C.split()[1][:-1]
+        lon = D.split()[1][:-1]
+        return [lat, lon]
+    

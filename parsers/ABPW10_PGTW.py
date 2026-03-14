@@ -13,19 +13,33 @@ class ABPW10_PGTW(MessageParser):
             (msg['wnpac_invest'], 'B. 热带扰动摘要'),
             (msg['wnpac_subtropical'], 'C. 副热带气旋摘要'),
         ]
-        translated_text = []
-        for text, name in wnpac_text:
-            if ': NONE.' in text:
-                translated_text.append(f'   {name}: 无。')
-            else:
-                translated_text.append(f'   {send_request(text)}')
+        spac_text = [
+            (msg['spac_cyclone'], 'A. 热带气旋摘要'),
+            (msg['spac_invest'], 'B. 热带扰动摘要'),
+            (msg['spac_subtropical'], 'C. 副热带气旋摘要'),
+        ]
+        translated_text_wnpac = []
+        translated_text_spac = []
+        def gen_tr(src_text):
+            tr_text = []
+            for text, name in src_text:
+                if ': NONE.' in text:
+                    tr_text.append(f'   {name}: 无。')
+                else:
+                    tr_text.append(f'   {send_request(text)}')
+            return tr_text
+        translated_text_wnpac = gen_tr(wnpac_text)
+        translated_text_spac = gen_tr(spac_text)
 
         expl = [
-            self.gen_header_expl(msg, "西太平洋重要热带天气公报"),
+            self.gen_header_expl(msg, "西太平洋与南太平洋重要热带天气公报"),
             '...',
             '1. 西太平洋区域（180度经线至马来半岛）：',
-            '\n'.join(translated_text),
+            '\n'.join(translated_text_wnpac),
+            '2. 南太平洋区域（南美洲西海岸到东经135度）：',
+            '\n'.join(translated_text_spac),
             '...',
+            self.ai_generated_tips(),
         ]
         return '\n'.join(expl)
 
@@ -54,7 +68,7 @@ class ABPW10_PGTW(MessageParser):
 
     def get_format(self) -> list:
         msg_format = [
-            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
+            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' COR', 'ws', 'cor:3'], 'br',
             'source:-SUBJ/',
             'subject:-//', 'ending:2', 'br',
             ['REF/', 'ref:$', 'br'],

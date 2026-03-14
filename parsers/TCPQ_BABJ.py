@@ -58,7 +58,10 @@ class TCPQ_BABJ(MessageParser):
             elif ci_raw == '99':
                 ci_str = '该气旋将逐渐转为温带气旋'
             else:
-                ci_str = f"CI值为{ci_raw[0]}.{ci_raw[1]}"
+                ci = f"{ci_raw[0]}.{ci_raw[1]}"
+                dvorak_spd = self.dvorak_kts(ci, agency="cma")
+                dvorak_spd_str = f"(~{dvorak_spd}m/s)" if dvorak_spd else ""
+                ci_str = f"CI值为{ci}{dvorak_spd_str}"
                 
             dir = msg['dir'+idx_string]
             spd = msg['spd'+idx_string]
@@ -110,7 +113,7 @@ class TCPQ_BABJ(MessageParser):
     def get_format(self) -> list:
         ty_disc_format = ['.', 'name:S', 'ws', 'ty_num:2', 'ty_la:3', 'ws', 'quadrant:1', 'ty_lo:4', 'ws', 'pad3:1', 'prec:1', 'horizon:1', 'intense:1', 'time_intv:1', 'ws', 'pad4:1', 'ci:2', 'slash:S', 'ws', 'pad5:1', 'dir:2', 'spd:2', 'br',],
         msg_format = [
-            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', 'br',
+            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' CC', 'ws', 'ccx:3'], 'br',
             'sarep:2', 'ty_dev:2', 'ws', 'ob_dd:2', 'ob_hh:2', 'ob_mm:1', 'ws', 'pad1:2', 'ob_la:3', 'ws', 'pad2:1', 'ob_lo:4', 'br',
         ]
         msg_format.extend(ty_disc_format * 5)

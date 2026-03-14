@@ -188,6 +188,9 @@ class MessageParser:
             'REMNANTS OF TROPICAL DEPRESSION': '热带低压残余',
             'REMNANTS OF TROPICAL STORM': '热带风暴残余',
             'REMNANTS OF TYPHOON': '台风残余',
+            'REMNANTS OF SUPER TYPHOON': '超强台风残余',
+            'SUPER TYPHOON': '超强台风',
+            'TROPICAL CYCLONE': '热带气旋',
             'TROPICAL DISTURBANCE': '热带扰动',
             'TROPICAL DEPRESSION': '热带低压',
             'TROPICAL STORM': '热带风暴',
@@ -198,3 +201,49 @@ class MessageParser:
             text = text.replace(term, translation)
         return text
     
+    def dvorak_kts(self, ft: str, agency: str="usa") -> int:
+        dvorak = {
+            "usa": {
+                "1.0": 25,
+                "1.5": 25,
+                "2.0": 30,
+                "2.5": 35,
+                "3.0": 45,
+                "3.5": 55,
+                "4.0": 65,
+                "4.5": 77,
+                "5.0": 90,
+                "5.5": 102,
+                "6.0": 115,
+                "6.5": 127,
+                "7.0": 140,
+                "7.5": 155,
+                "8.0": 170,
+            },  
+            "cma": {
+                "1.5": 13,
+                "2.0": 15,
+                "2.5": 18,
+                "3.0": 23,
+                "3.5": 28,
+                "4.0": 33,
+                "4.5": 38,
+                "5.0": 42,
+                "5.5": 48,
+                "6.0": 52,
+                "6.5": 58,
+                "7.0": 62,
+                "7.5": 68,
+                "8.0": 75,
+            }
+        }
+        return dvorak.get(agency, {}).get(ft, 0)
+        
+    
+    def ai_generated_tips(self, content: str=None) -> str:
+        if not content:
+            content = "翻译内容"
+        return f"（{content}由AI翻译生成，未经人工校验，请注意甄别）"
+    
+    def get_location_if_exists(self, msg: dict) -> list:
+        return []
