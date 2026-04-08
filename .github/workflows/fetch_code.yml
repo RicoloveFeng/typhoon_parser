@@ -34,8 +34,8 @@ jobs:
             git rm -rf . 2>/dev/null || true
           fi
       
-      # 步骤1：从natyphoon获取最近3天活跃的台风系统
-      - name: Fetch active systems from natyphoon
+      # 从natyphoon获取活跃台风系统，构造JTWC链接并下载
+      - name: Fetch active systems and download JTWC products
         run: |
           echo "=========================================="
           echo "  Step 1: Fetch active typhoon list"
@@ -45,56 +45,66 @@ jobs:
           curl -o natyphoon_index.html "https://www.natyphoon.top/atcf/temp/?C=M;O=A"
           echo "=== natyphoon page size: $(wc -c < natyphoon_index.html) bytes ==="
           
-          # 计算3天前的日期 (格式: YYYY/MM/DD)
-          CUTOFF_DATE=$(date -u -d '3 days ago' +'%Y/%m/%d')
+          # 提取 FN (文件名) 和 LM (最后修改时间) 两个JS数组
+          FN_RAW=$(sed -n 's/^const FN = \[\(.*\)\];$/\1/p' natyphoon_index.html)
+          LM_RAW=$(sed -n 's/^const LM = \[\(.*\)\];$/\1/p' natyphoon_index.html)
+          
+          # 转为换行分隔的列表（去掉引号）
+          echo "$FN_RAW" | tr ',' '\n' | sed 's/"//g' > /tmp/fn_list.txt
+          echo "$LM_RAW" | tr ',' '\n' | sed 's/"//g' > /tmp/lm_list.txt
+          
+          FN_COUNT=$(wc -l < /tmp/fn_list.txt)
+          LM_COUNT=$(wc -l < /tmp/lm_list.txt)
+          echo "FN entries: $FN_COUNT, LM entries: $LM_COUNT"
+          
+          # 计算2天前的日期 (格式: YYYY/MM/DD)
+          CUTOFF_DATE=$(date -u -d '2 days ago' +'%Y/%m/%d')
           echo "=== Cutoff date: $CUTOFF_DATE ==="
-          
-          # 提取所有 b{region}{num}{year}.dat 文件行，包含文件名和日期
-          # 页面格式示例: <a href="bwp902026.dat">bwp902026.dat</a>  2026/04/08 10:45  1.2K
           echo ""
-          echo "=== All .dat files found ==="
-          grep -oP 'href="(b[a-z]{2}\d{2,3}\d{4}\.dat)"[^>]*>[^<]*</a>\s+\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}' natyphoon_index.html || echo "(no matches with date pattern)"
           
-          echo ""
-          echo "=== Filtering files updated in last 3 days (since $CUTOFF_DATE) ==="
+          echo "=========================================="
+          echo "  Step 2: Filter active systems (last 2 days)"
+          echo "=========================================="
           
-          # 提取文件名和修改日期，筛选最近3天的
-          ACTIVE_FILES=""
-          while IFS= read -r line; do
-            # 提取文件名
-            FNAME=$(echo "$line" | grep -oP 'b[a-z]{2}\d{2,3}\d{4}\.dat' | head -1)
-            # 提取日期
-            FDATE=$(echo "$line" | grep -oP '\d{4}/\d{2}/\d{2}' | head -1)
-            
-            if [ -n "$FNAME" ] && [ -n "$FDATE" ]; then
-              # 比较日期（字符串比较即可，YYYY/MM/DD格式天然有序）
-              if [ "$FDATE" \>= "$CUTOFF_DATE" ] || [ "$FDATE" = "$CUTOFF_DATE" ]; then
-                echo "  ACTIVE: $FNAME (last modified: $FDATE)"
-                ACTIVE_FILES="$ACTIVE_FILES $FNAME"
-              fi
+          # 配对文件名和日期，筛选最近2天的
+          rm -f /tmp/active_typhoons.txt
+          touch /tmp/active_typhoons.txt
+          
+          paste /tmp/fn_list.txt /tmp/lm_list.txt > /tmp/paired_list.txt
+          while IFS=$'\t' read -r fname lm_date; do
+            # lm_date 格式: " 2026/04/08 10:45" (可能有前导空格)
+            DATE_PART=$(echo "$lm_date" | sed 's/^ *//' | cut -d' ' -f1)
+            if [[ -n "$DATE_PART" ]] && [[ "$DATE_PART" > "$CUTOFF_DATE" || "$DATE_PART" == "$CUTOFF_DATE" ]]; then
+              echo "  ACTIVE: $fname (last modified: $lm_date)"
+              echo "$fname" >> /tmp/active_typhoons.txt
             fi
-          done < <(grep -P 'b[a-z]{2}\d{2,3}\d{4}\.dat' natyphoon_index.html)
+          done < /tmp/paired_list.txt
           
-          if [ -z "$ACTIVE_FILES" ]; then
-            echo "No active systems found in last 3 days."
-            echo "=== Raw page content (first 100 lines) for debugging ==="
-            head -100 natyphoon_index.html
+          ACTIVE_COUNT=$(wc -l < /tmp/active_typhoons.txt | tr -d ' ')
+          echo ""
+          echo "Found $ACTIVE_COUNT active system(s)"
+          
+          if [ "$ACTIVE_COUNT" -eq 0 ]; then
+            echo "No active systems found in last 2 days."
+            echo "=== Last 10 entries for debugging ==="
+            paste /tmp/fn_list.txt /tmp/lm_list.txt | tail -10
             exit 0
           fi
           
           echo ""
           echo "=========================================="
-          echo "  Step 2: Construct JTWC URLs and fetch"
+          echo "  Step 3: Construct JTWC URLs and fetch"
           echo "=========================================="
           
           # 对每个活跃的台风系统，构造JTWC URL并尝试下载
-          for datfile in $ACTIVE_FILES; do
-            # 从 b{region}{num}{year}.dat 中提取信息
+          while IFS= read -r datfile; do
+            # 从 b{region}{num}{year}.dat 提取信息
             # 例如 bwp902026.dat -> region=wp, num=90, year=2026, shortyear=26
-            REGION=$(echo "$datfile" | sed -E 's/^b([a-z]{2})[0-9]+[0-9]{4}\.dat$/\1/')
-            NUM=$(echo "$datfile" | sed -E 's/^b[a-z]{2}([0-9]{2,3})[0-9]{4}\.dat$/\1/')
-            YEAR=$(echo "$datfile" | sed -E 's/^b[a-z]{2}[0-9]{2,3}([0-9]{4})\.dat$/\1/')
-            SHORT_YEAR=${YEAR: -2}
+            REGION=$(echo "$datfile" | sed -E 's/^b([a-z]{2})[0-9]+\.dat$/\1/')
+            NUMYEAR=$(echo "$datfile" | sed -E 's/^b[a-z]{2}(.*)\.dat$/\1/')
+            YEAR="${NUMYEAR: -4}"
+            NUM="${NUMYEAR%${YEAR}}"
+            SHORT_YEAR="${YEAR: -2}"
             
             echo ""
             echo "--- System: $datfile ---"
@@ -109,10 +119,11 @@ jobs:
               HTTP_CODE=$(curl -o "$OUTFILE" -w '%{http_code}' -s "$URL")
               
               if [ "$HTTP_CODE" = "200" ]; then
-                # 检查内容是否为Error页面
-                if grep -qiP '^\s*<' "$OUTFILE" || grep -qi 'error\|not found\|403\|forbidden' "$OUTFILE"; then
-                  echo "    -> HTTP 200 but content looks like error page, skipping"
-                  echo "    -> First 3 lines: $(head -3 "$OUTFILE")"
+                # 检查内容是否为HTML错误页面
+                FIRST_CHAR=$(head -c 1 "$OUTFILE")
+                if [ "$FIRST_CHAR" = "<" ]; then
+                  echo "    -> HTTP 200 but content is HTML (likely error page), skipping"
+                  echo "    -> First line: $(head -1 "$OUTFILE")"
                   rm -f "$OUTFILE"
                 else
                   FILESIZE=$(wc -c < "$OUTFILE")
@@ -125,14 +136,17 @@ jobs:
                 rm -f "$OUTFILE"
               fi
             done
-          done
+          done < /tmp/active_typhoons.txt
           
           echo ""
           echo "=========================================="
-          echo "  Step 3: Summary of downloaded files"
+          echo "  Step 4: Summary of downloaded files"
           echo "=========================================="
           echo "=== Files in current directory ==="
           ls -la *.txt 2>/dev/null || echo "(no .txt files downloaded)"
+          
+          # 清理临时文件
+          rm -f /tmp/active_typhoons.txt /tmp/fn_list.txt /tmp/lm_list.txt /tmp/paired_list.txt
       
       # 测试模式：不提交，只打印结果
       - name: Summary (test mode - no commit)
