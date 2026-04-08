@@ -66,63 +66,92 @@ jobs:
           ACTIVE_COUNT=$(wc -l < /tmp/active_typhoons.txt | tr -d ' ')
           if [ "$ACTIVE_COUNT" -eq 0 ]; then
             echo "No active systems found in last 2 days."
-            exit 0
+          else
+            # 临时目录存放下载的原始文件
+            mkdir -p /tmp/jtwc_downloads
+            rm -f /tmp/download_map.txt
+            touch /tmp/download_map.txt
+            
+            # 对每个活跃的台风系统，构造JTWC URL并尝试下载
+            while IFS=$'\t' read -r datfile sys_timestamp; do
+              REGION=$(echo "$datfile" | sed -E 's/^b([a-z]{2})[0-9]+\.dat$/\1/')
+              NUMYEAR=$(echo "$datfile" | sed -E 's/^b[a-z]{2}(.*)\.dat$/\1/')
+              YEAR="${NUMYEAR: -4}"
+              NUM="${NUMYEAR%${YEAR}}"
+              SHORT_YEAR="${YEAR: -2}"
+              
+              for TYPE in web prog fix; do
+                URL="https://www.metoc.navy.mil/jtwc/products/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
+                TMPFILE="/tmp/jtwc_downloads/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
+                
+                HTTP_CODE=$(curl -o "$TMPFILE" -w '%{http_code}' -s "$URL")
+                
+                if [ "$HTTP_CODE" = "200" ]; then
+                  FIRST_CHAR=$(head -c 1 "$TMPFILE")
+                  if [ "$FIRST_CHAR" = "<" ]; then
+                    echo "ERROR: $URL returned HTML error page"
+                    rm -f "$TMPFILE"
+                  else
+                    PREFIX6=$(head -c 6 "$TMPFILE" | tr '[:upper:]' '[:lower:]')
+                    echo -e "${PREFIX6}\t${TMPFILE}\t${sys_timestamp}\t${URL}" >> /tmp/download_map.txt
+                  fi
+                else
+                  if [ "$HTTP_CODE" != "404" ]; then
+                    echo "ERROR: $URL returned HTTP $HTTP_CODE"
+                  fi
+                  rm -f "$TMPFILE"
+                fi
+              done
+            done < /tmp/active_typhoons.txt
+            
+            # 按 prefix6 分组，同一 prefix6 保留 natyphoon 更新时间最新的
+            sort -t$'\t' -k1,1 -k3,3r /tmp/download_map.txt > /tmp/download_map_sorted.txt
+            
+            PREV_PREFIX=""
+            while IFS=$'\t' read -r prefix6 tmpfile sys_ts url; do
+              if [ "$prefix6" = "$PREV_PREFIX" ]; then
+                echo "CONFLICT: '${prefix6}' keeping newer (ts=$sys_ts), skipped $url"
+                rm -f "$tmpfile"
+              else
+                cp "$tmpfile" "${prefix6}.txt"
+                rm -f "$tmpfile"
+              fi
+              PREV_PREFIX="$prefix6"
+            done < /tmp/download_map_sorted.txt
+            
+            # 清理临时文件
+            rm -rf /tmp/jtwc_downloads /tmp/download_map.txt /tmp/download_map_sorted.txt
           fi
           
-          # 临时目录存放下载的原始文件
-          mkdir -p /tmp/jtwc_downloads
-          rm -f /tmp/download_map.txt
-          touch /tmp/download_map.txt
+          # 清理natyphoon临时文件
+          rm -rf /tmp/active_typhoons.txt /tmp/fn_list.txt /tmp/lm_list.txt /tmp/paired_list.txt
+      
+      # 直接下载 ABPW10 公报（不依赖natyphoon）
+      - name: Fetch ABPW10 product
+        run: |
+          TMPFILE="/tmp/abpwweb.txt"
+          HTTP_CODE=$(curl -o "$TMPFILE" -w '%{http_code}' -s "https://www.metoc.navy.mil/jtwc/products/abpwweb.txt")
           
-          # 对每个活跃的台风系统，构造JTWC URL并尝试下载
-          while IFS=$'\t' read -r datfile sys_timestamp; do
-            REGION=$(echo "$datfile" | sed -E 's/^b([a-z]{2})[0-9]+\.dat$/\1/')
-            NUMYEAR=$(echo "$datfile" | sed -E 's/^b[a-z]{2}(.*)\.dat$/\1/')
-            YEAR="${NUMYEAR: -4}"
-            NUM="${NUMYEAR%${YEAR}}"
-            SHORT_YEAR="${YEAR: -2}"
-            
-            for TYPE in web prog fix; do
-              URL="https://www.metoc.navy.mil/jtwc/products/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
-              TMPFILE="/tmp/jtwc_downloads/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
-              
-              HTTP_CODE=$(curl -o "$TMPFILE" -w '%{http_code}' -s "$URL")
-              
-              if [ "$HTTP_CODE" = "200" ]; then
-                FIRST_CHAR=$(head -c 1 "$TMPFILE")
-                if [ "$FIRST_CHAR" = "<" ]; then
-                  echo "ERROR: $URL returned HTML error page"
-                  rm -f "$TMPFILE"
-                else
-                  PREFIX6=$(head -c 6 "$TMPFILE" | tr '[:upper:]' '[:lower:]')
-                  echo -e "${PREFIX6}\t${TMPFILE}\t${sys_timestamp}\t${URL}" >> /tmp/download_map.txt
-                fi
-              else
-                if [ "$HTTP_CODE" != "404" ]; then
-                  echo "ERROR: $URL returned HTTP $HTTP_CODE"
-                fi
-                rm -f "$TMPFILE"
-              fi
-            done
-          done < /tmp/active_typhoons.txt
-          
-          # 按 prefix6 分组，同一 prefix6 保留 natyphoon 更新时间最新的
-          sort -t$'\t' -k1,1 -k3,3r /tmp/download_map.txt > /tmp/download_map_sorted.txt
-          
-          PREV_PREFIX=""
-          while IFS=$'\t' read -r prefix6 tmpfile sys_ts url; do
-            if [ "$prefix6" = "$PREV_PREFIX" ]; then
-              echo "CONFLICT: '${prefix6}' keeping newer (ts=$sys_ts), skipped $url"
-              rm -f "$tmpfile"
+          if [ "$HTTP_CODE" = "200" ]; then
+            FIRST_CHAR=$(head -c 1 "$TMPFILE")
+            if [ "$FIRST_CHAR" = "<" ]; then
+              echo "ERROR: abpwweb.txt returned HTML error page"
+              rm -f "$TMPFILE"
             else
-              cp "$tmpfile" "${prefix6}.txt"
-              rm -f "$tmpfile"
+              PREFIX6=$(head -c 6 "$TMPFILE" | tr '[:upper:]' '[:lower:]')
+              FINAL_NAME="${PREFIX6}.txt"
+              if [ -f "$FINAL_NAME" ]; then
+                echo "CONFLICT: '${PREFIX6}' already exists from natyphoon fetch, overwriting with abpwweb.txt"
+              fi
+              cp "$TMPFILE" "$FINAL_NAME"
+              rm -f "$TMPFILE"
             fi
-            PREV_PREFIX="$prefix6"
-          done < /tmp/download_map_sorted.txt
-          
-          # 清理临时文件
-          rm -rf /tmp/active_typhoons.txt /tmp/fn_list.txt /tmp/lm_list.txt /tmp/paired_list.txt /tmp/download_map.txt /tmp/download_map_sorted.txt /tmp/jtwc_downloads
+          else
+            if [ "$HTTP_CODE" != "404" ]; then
+              echo "ERROR: abpwweb.txt returned HTTP $HTTP_CODE"
+            fi
+            rm -f "$TMPFILE"
+          fi
       
       # 配置Git用户信息
       - name: Configure Git
