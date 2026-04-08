@@ -17,183 +17,127 @@ jobs:
         with:
           fetch-depth: 0  # 确保获取所有分支历史
       
-      # 切换到pgtw分支，如果不存在则创建
-      - name: Switch to pgtw branch or create it
+      # 切换到jtwc分支，如果不存在则创建
+      - name: Switch to jtwc branch or create it
         run: |
-          if git ls-remote --heads origin pgtw | grep -q pgtw; then
-            echo "Remote branch pgtw exists"
-            if git rev-parse --verify pgtw 2>/dev/null; then
-              git checkout pgtw
+          if git ls-remote --heads origin jtwc | grep -q jtwc; then
+            if git rev-parse --verify jtwc 2>/dev/null; then
+              git checkout jtwc
             else
-              git checkout -b pgtw origin/pgtw
+              git checkout -b jtwc origin/jtwc
             fi
-            git pull origin pgtw
+            git pull origin jtwc
           else
-            echo "Branch pgtw does not exist remotely, creating new local branch"
-            git checkout --orphan pgtw
+            git checkout --orphan jtwc
             git rm -rf . 2>/dev/null || true
           fi
       
       # 从natyphoon获取活跃台风系统，构造JTWC链接并下载
       - name: Fetch active systems and download JTWC products
         run: |
-          echo "=========================================="
-          echo "  Step 1: Fetch active typhoon list"
-          echo "=========================================="
-          
           # 下载natyphoon目录页
           curl -o natyphoon_index.html "https://www.natyphoon.top/atcf/temp/?C=M;O=A"
-          echo "=== natyphoon page size: $(wc -c < natyphoon_index.html) bytes ==="
           
           # 提取 FN (文件名) 和 LM (最后修改时间) 两个JS数组
           FN_RAW=$(sed -n 's/^const FN = \[\(.*\)\];$/\1/p' natyphoon_index.html)
           LM_RAW=$(sed -n 's/^const LM = \[\(.*\)\];$/\1/p' natyphoon_index.html)
+          rm -f natyphoon_index.html
           
           # 转为换行分隔的列表（去掉引号）
           echo "$FN_RAW" | tr ',' '\n' | sed 's/"//g' > /tmp/fn_list.txt
           echo "$LM_RAW" | tr ',' '\n' | sed 's/"//g' > /tmp/lm_list.txt
           
-          FN_COUNT=$(wc -l < /tmp/fn_list.txt)
-          LM_COUNT=$(wc -l < /tmp/lm_list.txt)
-          echo "FN entries: $FN_COUNT, LM entries: $LM_COUNT"
-          
           # 计算2天前的日期 (格式: YYYY/MM/DD)
           CUTOFF_DATE=$(date -u -d '2 days ago' +'%Y/%m/%d')
-          echo "=== Cutoff date: $CUTOFF_DATE ==="
-          echo ""
-          
-          echo "=========================================="
-          echo "  Step 2: Filter active systems (last 2 days)"
-          echo "=========================================="
           
           # 配对文件名和日期，筛选最近2天的
-          # 格式: 文件名<TAB>完整时间戳（去前导空格）
           rm -f /tmp/active_typhoons.txt
           touch /tmp/active_typhoons.txt
           
           paste /tmp/fn_list.txt /tmp/lm_list.txt > /tmp/paired_list.txt
           while IFS=$'\t' read -r fname lm_date; do
-            # lm_date 格式: " 2026/04/08 10:45" (可能有前导空格)
             CLEAN_DATE=$(echo "$lm_date" | sed 's/^ *//')
             DATE_PART=$(echo "$CLEAN_DATE" | cut -d' ' -f1)
             if [[ -n "$DATE_PART" ]] && [[ "$DATE_PART" > "$CUTOFF_DATE" || "$DATE_PART" == "$CUTOFF_DATE" ]]; then
-              echo "  ACTIVE: $fname (last modified: $CLEAN_DATE)"
-              # 记录文件名和完整时间戳，用于后续冲突解决
               echo -e "${fname}\t${CLEAN_DATE}" >> /tmp/active_typhoons.txt
             fi
           done < /tmp/paired_list.txt
           
           ACTIVE_COUNT=$(wc -l < /tmp/active_typhoons.txt | tr -d ' ')
-          echo ""
-          echo "Found $ACTIVE_COUNT active system(s)"
-          
           if [ "$ACTIVE_COUNT" -eq 0 ]; then
             echo "No active systems found in last 2 days."
-            echo "=== Last 10 entries for debugging ==="
-            paste /tmp/fn_list.txt /tmp/lm_list.txt | tail -10
             exit 0
           fi
           
-          echo ""
-          echo "=========================================="
-          echo "  Step 3: Construct JTWC URLs and fetch"
-          echo "=========================================="
-          
           # 临时目录存放下载的原始文件
           mkdir -p /tmp/jtwc_downloads
-          # 记录文件映射: prefix6 -> 临时文件路径 -> natyphoon更新时间
-          # 格式: prefix6<TAB>tmpfile<TAB>natyphoon_timestamp<TAB>original_url
           rm -f /tmp/download_map.txt
           touch /tmp/download_map.txt
           
           # 对每个活跃的台风系统，构造JTWC URL并尝试下载
           while IFS=$'\t' read -r datfile sys_timestamp; do
-            # 从 b{region}{num}{year}.dat 提取信息
-            # 例如 bwp902026.dat -> region=wp, num=90, year=2026, shortyear=26
             REGION=$(echo "$datfile" | sed -E 's/^b([a-z]{2})[0-9]+\.dat$/\1/')
             NUMYEAR=$(echo "$datfile" | sed -E 's/^b[a-z]{2}(.*)\.dat$/\1/')
             YEAR="${NUMYEAR: -4}"
             NUM="${NUMYEAR%${YEAR}}"
             SHORT_YEAR="${YEAR: -2}"
             
-            echo ""
-            echo "--- System: $datfile (natyphoon updated: $sys_timestamp) ---"
-            echo "    Region=$REGION, Num=$NUM, Year=$YEAR, ShortYear=$SHORT_YEAR"
-            
-            # 尝试三种type: web, prog, fix
             for TYPE in web prog fix; do
               URL="https://www.metoc.navy.mil/jtwc/products/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
               TMPFILE="/tmp/jtwc_downloads/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
               
-              echo "    Trying: $URL"
               HTTP_CODE=$(curl -o "$TMPFILE" -w '%{http_code}' -s "$URL")
               
               if [ "$HTTP_CODE" = "200" ]; then
-                # 检查内容是否为HTML错误页面
                 FIRST_CHAR=$(head -c 1 "$TMPFILE")
                 if [ "$FIRST_CHAR" = "<" ]; then
-                  echo "    -> HTTP 200 but content is HTML (likely error page), skipping"
-                  echo "    -> First line: $(head -1 "$TMPFILE")"
+                  echo "ERROR: $URL returned HTML error page"
                   rm -f "$TMPFILE"
                 else
-                  FILESIZE=$(wc -c < "$TMPFILE")
-                  # 取文件内容开头6个字符，转小写，作为目标文件名前缀
                   PREFIX6=$(head -c 6 "$TMPFILE" | tr '[:upper:]' '[:lower:]')
-                  echo "    -> SUCCESS ($FILESIZE bytes), prefix6='$PREFIX6'"
-                  echo "    -> First 3 lines:"
-                  head -3 "$TMPFILE" | sed 's/^/       /'
-                  # 记录映射
                   echo -e "${PREFIX6}\t${TMPFILE}\t${sys_timestamp}\t${URL}" >> /tmp/download_map.txt
                 fi
               else
-                echo "    -> HTTP $HTTP_CODE, skipping"
+                if [ "$HTTP_CODE" != "404" ]; then
+                  echo "ERROR: $URL returned HTTP $HTTP_CODE"
+                fi
                 rm -f "$TMPFILE"
               fi
             done
           done < /tmp/active_typhoons.txt
           
-          echo ""
-          echo "=========================================="
-          echo "  Step 4: Resolve conflicts and rename"
-          echo "=========================================="
-          
           # 按 prefix6 分组，同一 prefix6 保留 natyphoon 更新时间最新的
-          # 先按 prefix6 排序，再按时间戳倒序，取每组第一个
           sort -t$'\t' -k1,1 -k3,3r /tmp/download_map.txt > /tmp/download_map_sorted.txt
           
           PREV_PREFIX=""
           while IFS=$'\t' read -r prefix6 tmpfile sys_ts url; do
             if [ "$prefix6" = "$PREV_PREFIX" ]; then
-              echo "  CONFLICT: '$prefix6' from $url (ts=$sys_ts) -> SKIPPED (newer exists)"
+              echo "CONFLICT: '${prefix6}' keeping newer (ts=$sys_ts), skipped $url"
               rm -f "$tmpfile"
             else
-              FINAL_NAME="${prefix6}.txt"
-              echo "  KEEP: '$prefix6' -> $FINAL_NAME (from $url, ts=$sys_ts)"
-              cp "$tmpfile" "$FINAL_NAME"
+              cp "$tmpfile" "${prefix6}.txt"
               rm -f "$tmpfile"
             fi
             PREV_PREFIX="$prefix6"
           done < /tmp/download_map_sorted.txt
           
-          echo ""
-          echo "=========================================="
-          echo "  Step 5: Summary of final files"
-          echo "=========================================="
-          echo "=== Files in current directory ==="
-          ls -la *.txt 2>/dev/null || echo "(no .txt files)"
-          
           # 清理临时文件
           rm -rf /tmp/active_typhoons.txt /tmp/fn_list.txt /tmp/lm_list.txt /tmp/paired_list.txt /tmp/download_map.txt /tmp/download_map_sorted.txt /tmp/jtwc_downloads
       
-      # 测试模式：不提交，只打印结果
-      - name: Summary (test mode - no commit)
+      # 配置Git用户信息
+      - name: Configure Git
         run: |
-          echo "=========================================="
-          echo "  TEST MODE - No files will be committed"
-          echo "=========================================="
-          echo "Downloaded .txt files:"
-          for f in *.txt; do
-            if [ -f "$f" ]; then
-              echo "  $f ($(wc -c < "$f") bytes)"
-            fi
-          done 2>/dev/null || echo "  (none)"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+      
+      # 提交更改
+      - name: Commit and push changes
+        run: |
+          git add *.txt 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            FILE_COUNT=$(git diff --cached --name-only | wc -l | tr -d ' ')
+            git commit -m "Update JTWC products ($FILE_COUNT files): $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            git push origin jtwc
+          fi
