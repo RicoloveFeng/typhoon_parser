@@ -1,4 +1,4 @@
-name: Fetch ABPW Data
+name: Fetch JTWC Products
 
 # 触发条件：每10分钟自动运行，且允许手动触发
 on:
@@ -17,56 +17,132 @@ jobs:
         with:
           fetch-depth: 0  # 确保获取所有分支历史
       
-      # 切换到abpw分支，如果不存在则创建
-      - name: Switch to abpw branch or create it
+      # 切换到pgtw分支，如果不存在则创建
+      - name: Switch to pgtw branch or create it
         run: |
-          # 检查远程是否存在abpw分支
-          if git ls-remote --heads origin abpw | grep -q abpw; then
-            echo "Remote branch abpw exists"
-            # 检查本地是否已有abpw分支
-            if git rev-parse --verify abpw; then
-              echo "Local branch abpw exists, checking it out"
-              git checkout abpw
+          if git ls-remote --heads origin pgtw | grep -q pgtw; then
+            echo "Remote branch pgtw exists"
+            if git rev-parse --verify pgtw 2>/dev/null; then
+              git checkout pgtw
             else
-              echo "Local branch abpw does not exist, creating it from remote"
-              git checkout -b abpw origin/abpw
+              git checkout -b pgtw origin/pgtw
             fi
-            # 拉取远程最新更改
-            git pull origin abpw
+            git pull origin pgtw
           else
-            echo "Branch abpw does not exist remotely, creating new local branch"
-            git checkout --orphan abpw  # 创建一个无历史的新分支
-            git rm -rf .  # 清除工作区内容，从空白开始
+            echo "Branch pgtw does not exist remotely, creating new local branch"
+            git checkout --orphan pgtw
+            git rm -rf . 2>/dev/null || true
           fi
       
-      # 测试：下载JTWC主页并打印内容
-      - name: Test fetch JTWC main page
+      # 步骤1：从natyphoon获取最近3天活跃的台风系统
+      - name: Fetch active systems from natyphoon
         run: |
-          curl -o jtwc_page.html https://www.metoc.navy.mil/jtwc/jtwc.html
-          echo "=== File size ==="
-          wc -c jtwc_page.html
-          echo "=== Page content ==="
-          cat jtwc_page.html
-      
-      # 获取文件内容
-      - name: Fetch ABPW data
-        run: |
-          curl -o abpw10.txt https://www.metoc.navy.mil/jtwc/products/abpwweb.txt
-      
-      # 配置Git用户信息
-      - name: Configure Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-      
-      # 提交更改
-      - name: Commit and push changes
-        run: |
-          git add abpw10.txt
-          # 检查是否有更改
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update ABPW data: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-            git push origin abpw
+          echo "=========================================="
+          echo "  Step 1: Fetch active typhoon list"
+          echo "=========================================="
+          
+          # 下载natyphoon目录页
+          curl -o natyphoon_index.html "https://www.natyphoon.top/atcf/temp/?C=M;O=A"
+          echo "=== natyphoon page size: $(wc -c < natyphoon_index.html) bytes ==="
+          
+          # 计算3天前的日期 (格式: YYYY/MM/DD)
+          CUTOFF_DATE=$(date -u -d '3 days ago' +'%Y/%m/%d')
+          echo "=== Cutoff date: $CUTOFF_DATE ==="
+          
+          # 提取所有 b{region}{num}{year}.dat 文件行，包含文件名和日期
+          # 页面格式示例: <a href="bwp902026.dat">bwp902026.dat</a>  2026/04/08 10:45  1.2K
+          echo ""
+          echo "=== All .dat files found ==="
+          grep -oP 'href="(b[a-z]{2}\d{2,3}\d{4}\.dat)"[^>]*>[^<]*</a>\s+\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}' natyphoon_index.html || echo "(no matches with date pattern)"
+          
+          echo ""
+          echo "=== Filtering files updated in last 3 days (since $CUTOFF_DATE) ==="
+          
+          # 提取文件名和修改日期，筛选最近3天的
+          ACTIVE_FILES=""
+          while IFS= read -r line; do
+            # 提取文件名
+            FNAME=$(echo "$line" | grep -oP 'b[a-z]{2}\d{2,3}\d{4}\.dat' | head -1)
+            # 提取日期
+            FDATE=$(echo "$line" | grep -oP '\d{4}/\d{2}/\d{2}' | head -1)
+            
+            if [ -n "$FNAME" ] && [ -n "$FDATE" ]; then
+              # 比较日期（字符串比较即可，YYYY/MM/DD格式天然有序）
+              if [ "$FDATE" \>= "$CUTOFF_DATE" ] || [ "$FDATE" = "$CUTOFF_DATE" ]; then
+                echo "  ACTIVE: $FNAME (last modified: $FDATE)"
+                ACTIVE_FILES="$ACTIVE_FILES $FNAME"
+              fi
+            fi
+          done < <(grep -P 'b[a-z]{2}\d{2,3}\d{4}\.dat' natyphoon_index.html)
+          
+          if [ -z "$ACTIVE_FILES" ]; then
+            echo "No active systems found in last 3 days."
+            echo "=== Raw page content (first 100 lines) for debugging ==="
+            head -100 natyphoon_index.html
+            exit 0
           fi
+          
+          echo ""
+          echo "=========================================="
+          echo "  Step 2: Construct JTWC URLs and fetch"
+          echo "=========================================="
+          
+          # 对每个活跃的台风系统，构造JTWC URL并尝试下载
+          for datfile in $ACTIVE_FILES; do
+            # 从 b{region}{num}{year}.dat 中提取信息
+            # 例如 bwp902026.dat -> region=wp, num=90, year=2026, shortyear=26
+            REGION=$(echo "$datfile" | sed -E 's/^b([a-z]{2})[0-9]+[0-9]{4}\.dat$/\1/')
+            NUM=$(echo "$datfile" | sed -E 's/^b[a-z]{2}([0-9]{2,3})[0-9]{4}\.dat$/\1/')
+            YEAR=$(echo "$datfile" | sed -E 's/^b[a-z]{2}[0-9]{2,3}([0-9]{4})\.dat$/\1/')
+            SHORT_YEAR=${YEAR: -2}
+            
+            echo ""
+            echo "--- System: $datfile ---"
+            echo "    Region=$REGION, Num=$NUM, Year=$YEAR, ShortYear=$SHORT_YEAR"
+            
+            # 尝试三种type: web, prog, fix
+            for TYPE in web prog fix; do
+              URL="https://www.metoc.navy.mil/jtwc/products/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
+              OUTFILE="${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
+              
+              echo "    Trying: $URL"
+              HTTP_CODE=$(curl -o "$OUTFILE" -w '%{http_code}' -s "$URL")
+              
+              if [ "$HTTP_CODE" = "200" ]; then
+                # 检查内容是否为Error页面
+                if grep -qiP '^\s*<' "$OUTFILE" || grep -qi 'error\|not found\|403\|forbidden' "$OUTFILE"; then
+                  echo "    -> HTTP 200 but content looks like error page, skipping"
+                  echo "    -> First 3 lines: $(head -3 "$OUTFILE")"
+                  rm -f "$OUTFILE"
+                else
+                  FILESIZE=$(wc -c < "$OUTFILE")
+                  echo "    -> SUCCESS ($FILESIZE bytes)"
+                  echo "    -> First 3 lines:"
+                  head -3 "$OUTFILE" | sed 's/^/       /'
+                fi
+              else
+                echo "    -> HTTP $HTTP_CODE, skipping"
+                rm -f "$OUTFILE"
+              fi
+            done
+          done
+          
+          echo ""
+          echo "=========================================="
+          echo "  Step 3: Summary of downloaded files"
+          echo "=========================================="
+          echo "=== Files in current directory ==="
+          ls -la *.txt 2>/dev/null || echo "(no .txt files downloaded)"
+      
+      # 测试模式：不提交，只打印结果
+      - name: Summary (test mode - no commit)
+        run: |
+          echo "=========================================="
+          echo "  TEST MODE - No files will be committed"
+          echo "=========================================="
+          echo "Downloaded .txt files:"
+          for f in *.txt; do
+            if [ -f "$f" ]; then
+              echo "  $f ($(wc -c < "$f") bytes)"
+            fi
+          done 2>/dev/null || echo "  (none)"
