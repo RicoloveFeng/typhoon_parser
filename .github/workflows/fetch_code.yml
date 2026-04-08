@@ -39,6 +39,15 @@ jobs:
             git rm -rf .  # 清除工作区内容，从空白开始
           fi
       
+      # 测试：下载JTWC主页并打印内容
+      - name: Test fetch JTWC main page
+        run: |
+          curl -o jtwc_page.html https://www.metoc.navy.mil/jtwc/jtwc.html
+          echo "=== File size ==="
+          wc -c jtwc_page.html
+          echo "=== Page content ==="
+          cat jtwc_page.html
+      
       # 获取文件内容
       - name: Fetch ABPW data
         run: |
