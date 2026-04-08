@@ -67,16 +67,19 @@ jobs:
           echo "=========================================="
           
           # 配对文件名和日期，筛选最近2天的
+          # 格式: 文件名<TAB>完整时间戳（去前导空格）
           rm -f /tmp/active_typhoons.txt
           touch /tmp/active_typhoons.txt
           
           paste /tmp/fn_list.txt /tmp/lm_list.txt > /tmp/paired_list.txt
           while IFS=$'\t' read -r fname lm_date; do
             # lm_date 格式: " 2026/04/08 10:45" (可能有前导空格)
-            DATE_PART=$(echo "$lm_date" | sed 's/^ *//' | cut -d' ' -f1)
+            CLEAN_DATE=$(echo "$lm_date" | sed 's/^ *//')
+            DATE_PART=$(echo "$CLEAN_DATE" | cut -d' ' -f1)
             if [[ -n "$DATE_PART" ]] && [[ "$DATE_PART" > "$CUTOFF_DATE" || "$DATE_PART" == "$CUTOFF_DATE" ]]; then
-              echo "  ACTIVE: $fname (last modified: $lm_date)"
-              echo "$fname" >> /tmp/active_typhoons.txt
+              echo "  ACTIVE: $fname (last modified: $CLEAN_DATE)"
+              # 记录文件名和完整时间戳，用于后续冲突解决
+              echo -e "${fname}\t${CLEAN_DATE}" >> /tmp/active_typhoons.txt
             fi
           done < /tmp/paired_list.txt
           
@@ -96,8 +99,15 @@ jobs:
           echo "  Step 3: Construct JTWC URLs and fetch"
           echo "=========================================="
           
+          # 临时目录存放下载的原始文件
+          mkdir -p /tmp/jtwc_downloads
+          # 记录文件映射: prefix6 -> 临时文件路径 -> natyphoon更新时间
+          # 格式: prefix6<TAB>tmpfile<TAB>natyphoon_timestamp<TAB>original_url
+          rm -f /tmp/download_map.txt
+          touch /tmp/download_map.txt
+          
           # 对每个活跃的台风系统，构造JTWC URL并尝试下载
-          while IFS= read -r datfile; do
+          while IFS=$'\t' read -r datfile sys_timestamp; do
             # 从 b{region}{num}{year}.dat 提取信息
             # 例如 bwp902026.dat -> region=wp, num=90, year=2026, shortyear=26
             REGION=$(echo "$datfile" | sed -E 's/^b([a-z]{2})[0-9]+\.dat$/\1/')
@@ -107,46 +117,73 @@ jobs:
             SHORT_YEAR="${YEAR: -2}"
             
             echo ""
-            echo "--- System: $datfile ---"
+            echo "--- System: $datfile (natyphoon updated: $sys_timestamp) ---"
             echo "    Region=$REGION, Num=$NUM, Year=$YEAR, ShortYear=$SHORT_YEAR"
             
             # 尝试三种type: web, prog, fix
             for TYPE in web prog fix; do
               URL="https://www.metoc.navy.mil/jtwc/products/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
-              OUTFILE="${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
+              TMPFILE="/tmp/jtwc_downloads/${REGION}${NUM}${SHORT_YEAR}${TYPE}.txt"
               
               echo "    Trying: $URL"
-              HTTP_CODE=$(curl -o "$OUTFILE" -w '%{http_code}' -s "$URL")
+              HTTP_CODE=$(curl -o "$TMPFILE" -w '%{http_code}' -s "$URL")
               
               if [ "$HTTP_CODE" = "200" ]; then
                 # 检查内容是否为HTML错误页面
-                FIRST_CHAR=$(head -c 1 "$OUTFILE")
+                FIRST_CHAR=$(head -c 1 "$TMPFILE")
                 if [ "$FIRST_CHAR" = "<" ]; then
                   echo "    -> HTTP 200 but content is HTML (likely error page), skipping"
-                  echo "    -> First line: $(head -1 "$OUTFILE")"
-                  rm -f "$OUTFILE"
+                  echo "    -> First line: $(head -1 "$TMPFILE")"
+                  rm -f "$TMPFILE"
                 else
-                  FILESIZE=$(wc -c < "$OUTFILE")
-                  echo "    -> SUCCESS ($FILESIZE bytes)"
+                  FILESIZE=$(wc -c < "$TMPFILE")
+                  # 取文件内容开头6个字符，转小写，作为目标文件名前缀
+                  PREFIX6=$(head -c 6 "$TMPFILE" | tr '[:upper:]' '[:lower:]')
+                  echo "    -> SUCCESS ($FILESIZE bytes), prefix6='$PREFIX6'"
                   echo "    -> First 3 lines:"
-                  head -3 "$OUTFILE" | sed 's/^/       /'
+                  head -3 "$TMPFILE" | sed 's/^/       /'
+                  # 记录映射
+                  echo -e "${PREFIX6}\t${TMPFILE}\t${sys_timestamp}\t${URL}" >> /tmp/download_map.txt
                 fi
               else
                 echo "    -> HTTP $HTTP_CODE, skipping"
-                rm -f "$OUTFILE"
+                rm -f "$TMPFILE"
               fi
             done
           done < /tmp/active_typhoons.txt
           
           echo ""
           echo "=========================================="
-          echo "  Step 4: Summary of downloaded files"
+          echo "  Step 4: Resolve conflicts and rename"
+          echo "=========================================="
+          
+          # 按 prefix6 分组，同一 prefix6 保留 natyphoon 更新时间最新的
+          # 先按 prefix6 排序，再按时间戳倒序，取每组第一个
+          sort -t$'\t' -k1,1 -k3,3r /tmp/download_map.txt > /tmp/download_map_sorted.txt
+          
+          PREV_PREFIX=""
+          while IFS=$'\t' read -r prefix6 tmpfile sys_ts url; do
+            if [ "$prefix6" = "$PREV_PREFIX" ]; then
+              echo "  CONFLICT: '$prefix6' from $url (ts=$sys_ts) -> SKIPPED (newer exists)"
+              rm -f "$tmpfile"
+            else
+              FINAL_NAME="${prefix6}.txt"
+              echo "  KEEP: '$prefix6' -> $FINAL_NAME (from $url, ts=$sys_ts)"
+              cp "$tmpfile" "$FINAL_NAME"
+              rm -f "$tmpfile"
+            fi
+            PREV_PREFIX="$prefix6"
+          done < /tmp/download_map_sorted.txt
+          
+          echo ""
+          echo "=========================================="
+          echo "  Step 5: Summary of final files"
           echo "=========================================="
           echo "=== Files in current directory ==="
-          ls -la *.txt 2>/dev/null || echo "(no .txt files downloaded)"
+          ls -la *.txt 2>/dev/null || echo "(no .txt files)"
           
           # 清理临时文件
-          rm -f /tmp/active_typhoons.txt /tmp/fn_list.txt /tmp/lm_list.txt /tmp/paired_list.txt
+          rm -rf /tmp/active_typhoons.txt /tmp/fn_list.txt /tmp/lm_list.txt /tmp/paired_list.txt /tmp/download_map.txt /tmp/download_map_sorted.txt /tmp/jtwc_downloads
       
       # 测试模式：不提交，只打印结果
       - name: Summary (test mode - no commit)
