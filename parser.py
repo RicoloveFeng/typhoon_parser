@@ -14,6 +14,7 @@ from parsers.TXPQ2x_KNES import TXPQ2x_KNES
 from parsers.WTPN2x_PGTW import WTPN2x_PGTW
 from parsers.ABPW10_PGTW import ABPW10_PGTW
 from parsers.IUCC10_RJTD import IUCC10_RJTD
+from parsers.IUCC0x_VHHH import IUCC0x_VHHH
 from parsers.message_parser import MessageParser
 from parsers.default_parser import DefaultParser
 
@@ -31,6 +32,7 @@ class MessageParserManager:
         self.add_parser(WTPN2x_PGTW())
         self.add_parser(ABPW10_PGTW())
         self.add_parser(IUCC10_RJTD())
+        self.add_parser(IUCC0x_VHHH())
 
     def add_parser(self, parser: MessageParser):
         for header in parser.get_supported_headers():
@@ -81,7 +83,7 @@ class MessageParserManager:
             if 'NNNN' in raw_code:
                 real_content = raw_code.replace('NNNN', '').strip()
                 msg_meta['has_nnnn'] = True
-        elif source == "WIS":
+        elif source.startswith("WIS"):
             real_content = raw_code.strip()
         
         if real_content[-1] == '=':
