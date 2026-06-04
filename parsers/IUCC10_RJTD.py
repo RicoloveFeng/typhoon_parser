@@ -1,3 +1,4 @@
+from calendar import c
 from .message_parser import MessageParser
 from .deepseek_client import send_request
 class IUCC10_RJTD(MessageParser):
@@ -58,25 +59,91 @@ class IUCC10_RJTD(MessageParser):
             obs_time = f"{year}年{month}月{day}日{hour}时{minute}分"
 
             name = bufr_kv['WMO LONG STORM NAME']
+            if 'nameless' in name:
+                name = "未命名热带低压"
+            else:
+                name = f"热带气旋{name}"
+                
             number = bufr_kv['TYPHOON INTERNATIONAL COMMON NUMBER (TYPHOON COMMITTEE)']
+            if number.isspace():
+                number = f"（内部编号{bufr_kv['IDENTIFICATION NUMBER OF TROPICAL CYCLONE']}）"
+            else:
+                number = f"（编号{number}）"
 
             lat = bufr_kv['LATITUDE (COARSE ACCURACY)']
             lon = bufr_kv['LONGITUDE (COARSE ACCURACY)']
+            
+            direction = bufr_kv['DIRECTION OF MOTION OF FEATURE']
+            speed = bufr_kv['SPEED OF MOTION OF FEATURE']
+            
+            trend = bufr_kv['APPARENT 24-HOUR CHANGE IN INTENSITY OF TROPICAL CYCLONE']
+            trend_table = {
+                '0': '大幅减弱',
+                '1': '减弱',
+                '2': '保持',
+                '3': '增强',
+                '4': '大幅增强',
+                '9': '先前未观测',
+                '10': '未分析',
+            }
+            trend = trend_table.get(trend, '*解析失败*')
 
             ci = bufr_kv['CURRENT INTENSITY (CI) NUMBER OF THE TROPICAL CYCLONE']
-            dt = bufr_kv['DATA TROPICAL (DT) NUMBER OF THE TROPICAL CYCLONE']
-            met = bufr_kv['MODEL EXPECTED TROPICAL (MET) NUMBER OF THE TROPICAL CYCLONE']
-            pt = bufr_kv['PATTERN TROPICAL (PT) NUMBER OF THE TROPICAL CYCLONE']
-            ft = bufr_kv['FINAL TROPICAL (T) NUMBER OF THE TROPICAL CYCLONE']
+            if ci == 'None':
+                dvorak_str = "本报无德法分析"
+            else:
+                dt = bufr_kv['DATA TROPICAL (DT) NUMBER OF THE TROPICAL CYCLONE']
+                cloud_pattern_type = bufr_kv['CLOUD PATTERN TYPE OF THE DT- NUMBER']
+                cloud_pattern_table = {
+                    '1': '弯曲云带',
+                    '2': '切离度',
+                    '3': '风眼',
+                    '4': '云卷眼',
+                    '5': '中心密闭云区（CDO）',
+                    '6': '嵌匿中心',
+                    '7': '中心冷云盖（CCC)'
+                }
+                cloud_pattern = cloud_pattern_table.get(cloud_pattern_type, cloud_pattern_type)
+                
+                met = bufr_kv['MODEL EXPECTED TROPICAL (MET) NUMBER OF THE TROPICAL CYCLONE']
+                pt = bufr_kv['PATTERN TROPICAL (PT) NUMBER OF THE TROPICAL CYCLONE']
+                ft = bufr_kv['FINAL TROPICAL (T) NUMBER OF THE TROPICAL CYCLONE']
+                dbo_table = {
+                    '1': 'DT',
+                    '2': 'PT',
+                    '3': 'MET'
+                }
+                dbo = dbo_table.get(bufr_kv['TYPE OF THE FINAL T-NUMBER'], bufr_kv['TYPE OF THE FINAL T-NUMBER'])
+                met_fix = bufr_kv['TREND OF PAST 24-HOUR CHANGE (+: DEVELOPED, -: WEAKENED)']
 
-            trend = bufr_kv['TREND OF PAST 24-HOUR CHANGE (+: DEVELOPED, -: WEAKENED)']
+                cloud_picture_type = bufr_kv['CLOUD PICTURE TYPE OF THE PT- NUMBER']
+                cloud_picture_table = {
+                    '1': '弯曲云带型',
+                    '2': '中心密闭云区（CDO）型',
+                    '3': '切离型',
+                }
+                cloud_picture = cloud_picture_table.get(cloud_picture_type, cloud_picture_type)
+                
+                dvorak_spd = self.dvorak_kts(ci, 'jma')
 
+                dvorak_conclusion = [
+                    f'德法分析：',
+                    f'- 数据T值 DT={dt}, 基于{cloud_pattern}分析',
+                    f'- 模型预估T值 MET={met}, 趋势为{met_fix}',
+                    f'- 云型T值 PT={pt}, 特征类型为{cloud_picture}',
+                    f'-> 结论：最终T值 FT={ft}, 结论基于{dbo}。现时强度 CI={ci}(~{dvorak_spd}kts)'
+                ]
+
+                dvorak_str = '\n'.join(dvorak_conclusion)
+
+            
             expl = [
                 self.gen_header_expl(msg, "卫星分析报告"),
-                f"观测时间: {obs_time}",
-                f"热带气旋{name}(编号{number})，位置：{lat}N {lon}E",
-                f"德法结论：CI={ci}, DT={dt}, MET={met}, PT={pt}, FT={ft}",
-                f"过去24小时变化趋势：{trend}"
+                f"观测时间：{obs_time}",
+                f"观测对象：{name}{number}，位置：{lat}N {lon}E",
+                f"移速移向：以{speed}m/s向{direction}°移动",
+                f"过去24小时变化趋势：{trend}",
+                dvorak_str
             ]
         except Exception as e:
             print(e)
@@ -99,8 +166,9 @@ class IUCC10_RJTD(MessageParser):
         }
     
     def get_format(self) -> list:
+        # IUCC10 RJTD 100000CCA <- no space
         msg_format = [
-            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' CC', 'ws', 'ccx:3'], 'br',
+            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', ['CC', 'ccx:3'], 'br',
             'remarks:$$',
         ]
         return msg_format

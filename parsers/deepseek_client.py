@@ -16,7 +16,6 @@ def send_request(message, host='localhost', port=18100,):
 
             # 接收服务器响应
             response = client_socket.recv(4096).decode('utf-8')
-            print(f"服务器响应: {response}")
             return response
 
     except Exception as e:

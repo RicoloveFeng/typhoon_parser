@@ -18,6 +18,8 @@ locs = {
     'PALAWAN': '巴拉望岛',
     'SAMAR ISLAND': '萨马岛',
     'MASBATE ISLAND': '马斯巴特岛',
+    'CHUUK': '丘克岛',
+    'KOSRAE': '科斯雷岛',
 }
 
 dirs = {
@@ -39,7 +41,7 @@ class TPPN1x_PGTW(MessageParser):
     def explain(self, msg: dict) -> str:
         # \nA. TRO... 
         # TROPICAL DISTURBANCE 90W (E OF LUZON)
-        A = msg['A'][4:].strip()
+        A = msg['A'].lstrip()[3:].strip()
         geo_ref = A.split('(')[1].split(')')[0]
         if 'OVER' in geo_ref:  # OVER LUZON
             geo_info = geo_ref.split()
@@ -156,7 +158,7 @@ class TPPN1x_PGTW(MessageParser):
     
     def get_format(self) -> list:
         msg_format = [
-            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' COR', 'ws', 'cor:3'], 'br',
+            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' ', 'ws'], ['COR', 'cor:3'], 'br',
             'A:-B.',
             'B:-C.',
             'C:-D.',

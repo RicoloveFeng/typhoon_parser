@@ -49,7 +49,7 @@ class MessageParser:
                         # print('unmatched optional')
                         pass
                 elif rule == 'ws':
-                    while current_index < len(code) and code[current_index].isspace():
+                    while current_index < len(code) and code[current_index] == ' ':
                         current_index += 1
                     # print('ws')
                 elif rule == 'br':
@@ -235,6 +235,21 @@ class MessageParser:
                 "7.0": 62,
                 "7.5": 68,
                 "8.0": 75,
+            },
+            "jma": {
+                "2.0": 38,
+                "2.5": 43,
+                "3.0": 50,
+                "3.5": 57,
+                "4.0": 64,
+                "4.5": 71,
+                "5.0": 78,
+                "5.5": 85,
+                "6.0": 93,
+                "6.5": 100,
+                "7.0": 107,
+                "7.5": 115,
+                "8.0": 122,
             }
         }
         return dvorak.get(agency, {}).get(ft, 0)

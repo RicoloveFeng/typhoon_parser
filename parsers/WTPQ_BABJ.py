@@ -36,7 +36,9 @@ class WTPQ_BABJ(MessageParser):
         if 'dom_num' not in msg:
             name_str = f"热带低压{msg['name']} 未命名"
         else:
-            name_str = f"{cat_expl[msg['cat']]}{msg['name']}，编号{msg['dom_num']}，国际编号{msg['inter_num']}"
+            name_str = f"{cat_expl[msg['cat']]}{msg['name']}，编号{msg['dom_num']}"
+        if 'inter_num' in msg:
+            name_str += f"，国际编号{msg['inter_num']}"
         expl = [
             self.gen_header_expl(msg, "台风综合预报报文"),
             name_str,
@@ -125,7 +127,7 @@ class WTPQ_BABJ(MessageParser):
         msg_format = [
             'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' CC', 'ws', 'ccx:3'],  'br',
             'subjective_forecast:$', 'br',
-            'cat:S', 'ws', 'name:S', [' [0-9]', 'ws', 'dom_num:S', 'ws', 'inter_num:S'], 'ws', 'initial_time:12', 'ws', 'init_dd:2', 'init_hh:2', 'init_mm:2', 'ws', 'utc:3', 'br',
+            'cat:S', 'ws', 'name:S', [' [0-9]', 'ws', 'dom_num:S', [' \(', 'ws', 'inter_num:S']], 'ws', 'initial_time:12', 'ws', 'init_dd:2', 'init_hh:2', 'init_mm:2', 'ws', 'utc:3', 'br',
             '00hr:4', 'ws', 'ty_la:S', 'ws', 'ty_lo:S', 'ws', 'pressure:S', 'ws', 'wind_spd:S', 'br',
             ['30KTS', '30kts_winds:11', 'ws', '30kts_NE_rad:S', 'ws', 'northeast:S', 'br',
             '30kts_SE_rad:S', 'ws', 'southeast:S', 'br',
