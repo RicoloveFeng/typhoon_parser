@@ -186,6 +186,7 @@ class MessageParser:
     def translate_common_terms(self, text: str) -> str:
         terms = {
             'SUBTROPICAL DEPRESSION': '副热带低压',
+            'EXTRATROPICAL CYCLONE': '温带气旋',
             'REMNANTS OF TROPICAL DEPRESSION': '热带低压残余',
             'REMNANTS OF TROPICAL STORM': '热带风暴残余',
             'REMNANTS OF TYPHOON': '台风残余',
@@ -196,7 +197,6 @@ class MessageParser:
             'TROPICAL DEPRESSION': '热带低压',
             'TROPICAL STORM': '热带风暴',
             'TYPHOON': '台风',
-            'EXTRATROPICAL CYCLONE': '温带气旋'
         }
         for term, translation in terms.items():
             text = text.replace(term, translation)

@@ -12,9 +12,14 @@ class WTPN2x_PGTW(MessageParser):
     def explain(self, msg: dict) -> str:
         # SUBJ/TROPICAL CYCLONE FORMATION ALERT (INVEST 95W)//
         if msg.get('subj'):
-            target = re.search(r'\((.*?)\)', msg['subj']).group(1)
-            target = target.replace('INVEST', '扰动')
-            subj = f"针对{self.translate_common_terms(target)} 的热带气旋形成警告" if 'CANCEL' not in msg['subj'] else f"取消{self.translate_common_terms(target)} 的热带气旋形成警告"
+            re_target = re.search(r'\((.*?)\)', msg['subj'])
+            if re_target:
+                target = re_target.group(1)
+                target = target.replace('INVEST', '扰动')
+                subj = f"针对{self.translate_common_terms(target)} 的热带气旋形成警告" if 'CANCEL' not in msg['subj'] else f"取消{self.translate_common_terms(target)} 的热带气旋形成警告"
+            else:
+                subj = "热带气旋形成警告"
+
         else:
             subj = ""
         expl = [
@@ -45,7 +50,7 @@ class WTPN2x_PGTW(MessageParser):
 
     def get_format(self) -> list:
         msg_format = [
-                'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' COR', 'ws', 'cor:3'], 'br',
+            'type:2', 'area:2', 'ii:2', 'ws', 'msg_center:4', 'ws', 'msg_dd:2', 'msg_hh:2', 'msg_mm:2', [' ', 'ws'], ['COR', 'cor:3'], 'br',
             ['MSGID/', 'source:$', 'br'],
             ['SUBJ/', 'subj:$', 'br'],
             ['REF/', 'ref:$', 'br'],
